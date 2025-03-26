@@ -1,0 +1,46 @@
+{
+  "tasks": {
+    "test": "deno test --allow-read --allow-write --allow-run",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "e2e-test": "deno run --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/test.ts"
+  },
+  "fmt": {
+    "files": {
+      "include": [
+        "src/",
+        "tests/"
+      ]
+    },
+    "options": {
+      "lineWidth": 100,
+      "indentWidth": 2,
+      "singleQuote": true
+    }
+  },
+  "lint": {
+    "files": {
+      "include": [
+        "src/",
+        "tests/"
+      ]
+    },
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": [
+      "deno.window",
+      "deno.ns",
+      "dom"
+    ]
+  },
+  "imports": {
+    "@std/assert": "https://deno.land/std@0.208.0/assert/mod.ts",
+    "@std/fs": "https://deno.land/std@0.208.0/fs/mod.ts"
+  }
+}
