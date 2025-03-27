@@ -1,10 +1,11 @@
-import { expandGlob } from '@std/fs';
+import { expandGlob } from "@std/fs";
 
-import { Mutator } from './core/mutator.ts';
-import { Reporter } from './runner/reporter.ts';
+import { Mutator } from "./core/mutator.ts";
+import { Reporter } from "./runner/reporter.ts";
+import { TestRunner } from "./runner/test.ts";
 
-type MutationStatus = 'killed' | 'survived' | 'error' | 'waiting';
-type MutationRuns = {
+type MutationStatus = "killed" | "survived" | "error" | "waiting";
+export type MutationRun = {
   original: {
     filePath: string;
     content: string;
@@ -19,6 +20,14 @@ type MutationRuns = {
 export interface MutasaurusConfig {
   sourceFiles: string[];
   testFiles: string[];
+  operators: string[];
+  workers: number;
+  timeout: number;
+}
+
+export interface MutasaurusConfigInput {
+  sourceFiles?: string[];
+  testFiles?: string[];
   operators?: string[];
   workers?: number;
   timeout?: number;
@@ -28,28 +37,22 @@ export interface MutasaurusResults {
   totalMutations: number;
   killedMutations: number;
   survivedMutations: number;
-  mutations: MutationRuns[];
+  mutations: MutationRun[];
 }
 
 export class Mutasaurus {
   private config: MutasaurusConfig = {
     sourceFiles: [],
     testFiles: [],
-    operators: ['arithmetic', 'logical', 'control'],
+    operators: ["arithmetic", "logical", "control"],
     workers: 4,
     timeout: 5000,
   };
   private mutator: Mutator;
   private reporter: Reporter;
+  private testRunner: TestRunner;
 
-  private ensureDirectoryExists(filePath: string): void {
-    const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
-    if (dirPath) {
-      Deno.mkdirSync(dirPath, { recursive: true });
-    }
-  }
-
-  constructor(config: MutasaurusConfig) {
+  constructor(config: MutasaurusConfigInput) {
     this.config = {
       ...this.config,
       ...config,
@@ -57,6 +60,75 @@ export class Mutasaurus {
 
     this.mutator = new Mutator();
     this.reporter = new Reporter();
+    this.testRunner = new TestRunner(this.config.workers, this.config.timeout);
+  }
+
+  async run(generateReport: boolean = true): Promise<MutasaurusResults> {
+    // Initialize the config asynchronously
+    await this.expandFilepathGlobs();
+    console.log("Beginning run with config:");
+    console.log(this.config);
+
+    // Build a list of all possible mutations based off all the supplied files.
+    const mutations: MutationRun[] = [];
+    for (const sourceFile of this.config.sourceFiles) {
+      const content = await Deno.readTextFile(sourceFile);
+      const fileMutations = this.mutator.generateMutationsList(
+        content,
+        sourceFile,
+      );
+
+      for (const mutation of fileMutations) {
+        // TODO: This operation probably resides elsewhere.
+        let modifiedContent = content;
+        modifiedContent = modifiedContent.slice(0, mutation.location.start) +
+          ` ${mutation.operator} ` +
+          modifiedContent.slice(mutation.location.end);
+        mutations.push({
+          original: {
+            filePath: sourceFile,
+            content,
+          },
+          mutation: modifiedContent,
+          operator: mutation.operator,
+          start: mutation.location.start,
+          status: "waiting",
+          duration: 0,
+        });
+      }
+    }
+
+    // TODO: There is a way to only run the tests that are needed, based off the coverage report.
+    // TODO: Errors may occur in this loop, but we don't handle them.
+    const result = await this.testRunner.runTests({
+      mutations,
+      sourceFiles: this.config.sourceFiles,
+      testFiles: this.config.testFiles,
+    });
+    const killedMutations =
+      result.filter((result) => result.mutation.status === "killed").length;
+    const survivedMutations =
+      result.filter((result) => result.mutation.status === "survived").length;
+    const outcome = {
+      totalMutations: mutations.length,
+      killedMutations,
+      survivedMutations,
+      mutations: result.map((result) => result.mutation),
+    };
+    if (generateReport) {
+      await this.reporter.generateReport(outcome);
+    }
+
+    try {
+      await Deno.remove("./.mutasaurus", { recursive: true });
+    } catch (cleanupError) {
+      console.error(
+        "Failed to cleanup temporary test directory:",
+        cleanupError,
+      );
+    }
+
+    return outcome;
   }
 
   private async expandFilepathGlobs(): Promise<void> {
@@ -89,116 +161,5 @@ export class Mutasaurus {
       sourceFiles: filteredSourceFiles,
       testFiles: expandedTestFiles,
     };
-  }
-
-  async run(generateReport: boolean = true): Promise<MutasaurusResults> {
-    // Initialize the config asynchronously
-    await this.expandFilepathGlobs();
-    console.log('Beginning run with config:');
-    console.log(this.config);
-
-    // Build a list of all possible mutations based off all the supplied files.
-    const mutations: MutationRuns[] = [];
-    for (const sourceFile of this.config.sourceFiles) {
-      const content = await Deno.readTextFile(sourceFile);
-      const fileMutations = this.mutator.generateMutationsList(content, sourceFile);
-
-      for (const mutation of fileMutations) {
-        let modifiedContent = content;
-        modifiedContent = modifiedContent.slice(0, mutation.location.start) +
-          ` ${mutation.operator} ` +
-          modifiedContent.slice(mutation.location.end);
-        mutations.push({
-          original: {
-            filePath: sourceFile,
-            content,
-          },
-          mutation: modifiedContent,
-          operator: mutation.operator,
-          start: mutation.location.start,
-          status: 'waiting',
-          duration: 0,
-        });
-      }
-    }
-
-    // TODO: There is a way to parallelize this, using workers.
-    // TODO: There is a way to only run the tests that are needed, based off the coverage report.
-    // TODO: Errors may occur in this loop, but we don't handle them.
-    // For each mutation, we test it using the provided test suite.
-    for (const mutation of mutations) {
-      const startTime = performance.now();
-
-      // Create a temporary working directory for the mutation.
-      const workingDirectory = `./.mutasaurus/${Math.random().toString(36).substring(7)}`;
-      Deno.mkdirSync(workingDirectory, { recursive: true });
-
-      // Copy all source and test files into the working directory
-      for (const sourceFile of this.config.sourceFiles) {
-        const filePath = `${sourceFile}`;
-        const content = await Deno.readTextFile(filePath);
-        const targetPath = `${workingDirectory}/${sourceFile}`;
-        this.ensureDirectoryExists(targetPath);
-        Deno.writeTextFileSync(targetPath, content);
-      }
-
-      for (const testFile of this.config.testFiles) {
-        const filePath = `${testFile}`;
-        const content = await Deno.readTextFile(filePath);
-        const targetPath = `${workingDirectory}/${testFile}`;
-        this.ensureDirectoryExists(targetPath);
-        Deno.writeTextFileSync(targetPath, content);
-      }
-
-      // Copy the mutation into the working directory
-      const mutationTargetPath = `${workingDirectory}/${mutation.original.filePath}`;
-      this.ensureDirectoryExists(mutationTargetPath);
-      Deno.writeTextFileSync(mutationTargetPath, mutation.mutation);
-
-      const process = new Deno.Command('deno', {
-        args: [
-          'test',
-          '--allow-read',
-          '--allow-write',
-          '--allow-run',
-          `${workingDirectory}`,
-        ],
-        stdout: 'piped',
-        stderr: 'piped',
-      });
-
-      const { stderr } = await process.output();
-      const duration = performance.now() - startTime;
-
-      if (new TextDecoder().decode(stderr).includes('Test failed')) {
-        mutation.status = 'killed';
-      } else {
-        mutation.status = 'survived';
-      }
-      mutation.duration = duration;
-
-      try {
-        await Deno.remove(workingDirectory, { recursive: true });
-      } catch (cleanupError) {
-        console.error('Failed to cleanup temporary test directory:', cleanupError);
-      }
-    }
-
-    const outcome = {
-      totalMutations: mutations.length,
-      killedMutations: mutations.filter((mutation) => mutation.status === 'killed').length,
-      survivedMutations: mutations.filter((mutation) => mutation.status === 'survived').length,
-      mutations,
-    };
-    if (generateReport) {
-      await this.reporter.generateReport(outcome);
-    }
-    try {
-      await Deno.remove('./.mutasaurus', { recursive: true });
-    } catch (cleanupError) {
-      console.error('Failed to cleanup temporary test directory:', cleanupError);
-    }
-
-    return outcome;
   }
 }

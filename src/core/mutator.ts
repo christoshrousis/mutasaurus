@@ -1,11 +1,11 @@
-import { parseAndWalk } from 'npm:oxc-walker';
+import { parseAndWalk } from "npm:oxc-walker";
 import {
   AssignmentExpression,
   AssignmentOperator,
   BinaryExpression,
   BinaryOperator,
   Node,
-} from 'npm:oxc-parser';
+} from "npm:oxc-parser";
 
 export interface MutationLocation {
   file: string;
@@ -17,26 +17,29 @@ export interface MutationLocation {
 export type AssignmentExpressionMutation = {
   operator: AssignmentOperator;
   location: {
-    start: AssignmentExpression['left']['end'];
-    end: AssignmentExpression['right']['start'];
+    start: AssignmentExpression["left"]["end"];
+    end: AssignmentExpression["right"]["start"];
   };
 };
 
 export type BinaryExpressionMutation = {
   operator: BinaryOperator;
   location: {
-    start: BinaryExpression['left']['end'];
-    end: BinaryExpression['right']['start'];
+    start: BinaryExpression["left"]["end"];
+    end: BinaryExpression["right"]["start"];
   };
 };
 
 export type Mutation = BinaryExpressionMutation | AssignmentExpressionMutation;
 
-const arithmeticOperators: Record<'+' | '-' | '*' | '/', Array<BinaryOperator>> = {
-  '+': ['-', '*', '/'],
-  '-': ['+', '*', '/'],
-  '*': ['+', '-', '/'],
-  '/': ['+', '-', '*'],
+const arithmeticOperators: Record<
+  "+" | "-" | "*" | "/",
+  Array<BinaryOperator>
+> = {
+  "+": ["-", "*", "/"],
+  "-": ["+", "*", "/"],
+  "*": ["+", "-", "/"],
+  "/": ["+", "-", "*"],
 } as const;
 
 const isSupportedArithmeticOperator = (
@@ -45,11 +48,14 @@ const isSupportedArithmeticOperator = (
   return operator in arithmeticOperators;
 };
 
-const assignmentOperators: Record<'+=' | '-=' | '*=' | '/=', Array<AssignmentOperator>> = {
-  '+=': ['=', '-=', '*=', '/='],
-  '-=': ['=', '+=', '*=', '/='],
-  '*=': ['=', '-=', '+=', '/='],
-  '/=': ['=', '-=', '*=', '+='],
+const assignmentOperators: Record<
+  "+=" | "-=" | "*=" | "/=",
+  Array<AssignmentOperator>
+> = {
+  "+=": ["=", "-=", "*=", "/="],
+  "-=": ["=", "+=", "*=", "/="],
+  "*=": ["=", "-=", "+=", "/="],
+  "/=": ["=", "-=", "*=", "+="],
 } as const;
 
 const isSupportedAssignmentOperator = (
@@ -62,13 +68,13 @@ export class Mutator {
   constructor() {}
 
   generateMutationsList(content: string, filePath: string): Mutation[] {
-    const fileName = filePath.split('/').pop()!;
+    const fileName = filePath.split("/").pop()!;
     const mutations: Mutation[] = [];
 
     parseAndWalk(content, fileName, {
       enter(node: Node) {
         switch (node.type) {
-          case 'BinaryExpression':
+          case "BinaryExpression":
             if (isSupportedArithmeticOperator(node.operator)) {
               const start = node.left.end;
               const end = node.right.start;
@@ -85,7 +91,7 @@ export class Mutator {
               }
             }
             break;
-          case 'AssignmentExpression':
+          case "AssignmentExpression":
             if (isSupportedAssignmentOperator(node.operator)) {
               const start = node.left.end;
               const end = node.right.start;

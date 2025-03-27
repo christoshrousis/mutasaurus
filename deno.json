@@ -6,17 +6,10 @@
     "e2e-test": "deno run --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/test.ts"
   },
   "fmt": {
-    "files": {
-      "include": [
-        "src/",
-        "tests/"
-      ]
-    },
-    "options": {
-      "lineWidth": 100,
-      "indentWidth": 2,
-      "singleQuote": true
-    }
+    "include": [
+      "src/",
+      "tests/"
+    ]
   },
   "lint": {
     "files": {
