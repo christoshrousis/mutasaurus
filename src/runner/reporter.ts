@@ -7,7 +7,7 @@ export class Reporter {
     const mutationScore = (killedMutations / totalMutations) * 100;
 
     let output = "\nMutation Testing Report\n";
-    output += "=====================\n\n";
+    output += "=====================\n";
 
     if (survivedMutations > 0) {
       output += "\nSurvived Mutations:\n";
@@ -19,8 +19,7 @@ export class Reporter {
             r.original.content,
             r.start,
           );
-          output += `File: ${r.original.filePath}\n`;
-          output += `Line: ${line}, Column: ${column}\n`;
+          output += `File: ${r.original.filePath}:${line}:${column}\n`;
           output += `Operator: ${r.operator}\n`;
 
           output += "\n";

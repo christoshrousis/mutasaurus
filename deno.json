@@ -3,7 +3,7 @@
     "test": "deno test --allow-read --allow-write --allow-run",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "e2e-test": "deno run --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/test.ts"
+    "ok": "deno run --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/test.ts"
   },
   "fmt": {
     "include": [
@@ -12,12 +12,10 @@
     ]
   },
   "lint": {
-    "files": {
-      "include": [
-        "src/",
-        "tests/"
-      ]
-    },
+    "include": [
+      "src/",
+      "tests/"
+    ],
     "rules": {
       "tags": [
         "recommended"
@@ -26,14 +24,13 @@
   },
   "compilerOptions": {
     "strict": true,
-    "lib": [
-      "deno.window",
-      "deno.ns",
-      "dom"
-    ]
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
   },
   "imports": {
-    "@std/assert": "https://deno.land/std@0.208.0/assert/mod.ts",
-    "@std/fs": "https://deno.land/std@0.208.0/fs/mod.ts"
+    "@std/assert": "https://deno.land/std@0.224.0/assert/mod.ts",
+    "@std/fs": "https://deno.land/std@0.224.0/fs/mod.ts"
   }
 }
