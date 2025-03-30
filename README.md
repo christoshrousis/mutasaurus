@@ -11,21 +11,10 @@ automatically introducing mutations into your code.
 - 🎯 Configurable mutation operators
 - 🔍 Source map support for accurate error reporting
 
-## Installation
-
-```typescript
-// Import map example
-{
-  "imports": {
-    "mutasaurus": "https://deno.land/x/mutasaurus@v0.0.1/mod.ts"
-  }
-}
-```
-
 ## Quick Start
 
 ```typescript
-import { Mutasaurus } from 'https://deno.land/x/mutasaurus/mod.ts';
+import { Mutasaurus } from 'jsr:@mutasaurus/mutasaurus';
 
 const mutasaurus = new Mutasaurus({
   sourceFiles: ['./src/**/*.ts'],

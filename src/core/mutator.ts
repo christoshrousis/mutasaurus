@@ -1,11 +1,10 @@
-import { parseAndWalk } from "npm:oxc-walker";
+import { Node, parseAndWalk } from "oxc-walker";
 import {
   AssignmentExpression,
   AssignmentOperator,
   BinaryExpression,
   BinaryOperator,
-  Node,
-} from "npm:oxc-parser";
+} from "oxc-project-types";
 
 export interface MutationLocation {
   file: string;

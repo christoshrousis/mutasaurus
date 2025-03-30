@@ -1,10 +1,23 @@
+// mod.ts
+/**
+ * The core responsibility of this module is to orchestrate the mutation testing process.
+ *
+ * It will:
+ * - Expand any file globs in the source and test files.
+ * - Build a list of all possible mutations based off all the supplied files.
+ * - Run the tests against the mutations.
+ * - Generate a report.
+ *
+ * @module
+ */
+
 import { expandGlob } from "@std/fs";
 
 import { Mutator } from "./core/mutator.ts";
 import { Reporter } from "./runner/reporter.ts";
 import { TestRunner } from "./runner/test.ts";
 
-type MutationStatus = "killed" | "survived" | "error" | "waiting";
+export type MutationStatus = "killed" | "survived" | "error" | "waiting";
 export type MutationRun = {
   original: {
     filePath: string;
