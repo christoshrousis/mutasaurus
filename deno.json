@@ -1,12 +1,11 @@
 {
   "name": "@mutasaurus/mutasaurus",
-  "version": "0.0.1",
-  "exports": "./src/mod.ts",
+  "version": "0.0.2",
+  "exports": "./mod.ts",
   "tasks": {
-    "test": "deno test --allow-read --allow-write --allow-run",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "ok": "deno run --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/test.ts"
+    "ok": "deno test --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/ok.test.ts"
   },
   "fmt": {
     "include": [
@@ -33,9 +32,8 @@
     "noUncheckedIndexedAccess": true
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert",
+    "@std/assert": "jsr:@std/assert@1.0.11",
     "@std/fs": "jsr:@std/fs@1.0.15",
-    "oxc-parser": "npm:oxc-parser",
     "oxc-walker": "npm:oxc-walker@0.2.3",
     "oxc-project-types": "npm:@oxc-project/types@0.61.1"
   }

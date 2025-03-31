@@ -1,23 +1,26 @@
-// mod.ts
-/**
- * The core responsibility of this module is to orchestrate the mutation testing process.
- *
- * It will:
- * - Expand any file globs in the source and test files.
- * - Build a list of all possible mutations based off all the supplied files.
- * - Run the tests against the mutations.
- * - Generate a report.
- *
- * @module
- */
-
 import { expandGlob } from "@std/fs";
 
-import { Mutator } from "./core/mutator.ts";
-import { Reporter } from "./runner/reporter.ts";
-import { TestRunner } from "./runner/test.ts";
+import { Mutator } from "./mutator.ts";
+import { Reporter } from "./reporter.ts";
+import { TestRunner } from "./testRunner.ts";
 
-export type MutationStatus = "killed" | "survived" | "error" | "waiting";
+/**
+ * The different states that a MutationRun can be in, as part of the mutation testing process.
+ *
+ * - `waiting`: The mutation is waiting to be tested.
+ * - `killed`: The mutation was killed by the tests.
+ * - `survived`: The mutation survived the tests.
+ * - `error`: The mutation caused an error to be thrown.
+ */
+export type MutationStatus = "waiting" | "killed" | "survived" | "error";
+
+/**
+ * A single mutation run, as part of the mutation testing process.
+ *
+ * This represents a single mutation, as it passes through it's different states,
+ * from waiting, implying that the mutation is identified, to killed or survived,
+ * implying that the mutation has been tested and it's result is known.
+ */
 export type MutationRun = {
   original: {
     filePath: string;
@@ -30,14 +33,29 @@ export type MutationRun = {
   duration: number;
 };
 
+/**
+ * The internal configuration for the Mutasaurus mutation testing framework.
+ */
 export interface MutasaurusConfig {
+  /** Files identified as source files to be mutated. */
   sourceFiles: string[];
+  /** Files identified as test files to be run against the mutations. */
   testFiles: string[];
+  /** The operators to be used for the mutations. TODO: Define the operators instead of using strings*/
   operators: string[];
+  /** The number of workers to be used when creating worker pools to run the tests against the mutations. */
   workers: number;
+  /** The timeout for the individual workers in the worker pools.. */
   timeout: number;
 }
 
+/**
+ * The internal configuration for the Mutasaurus mutation testing framework,
+ * as optional parameters, accepted by the constructor of the Mutasaurus class.
+ *
+ * This allows the end user to optionally supply a subset of configuration,
+ * while allowing us to set a default.
+ */
 export interface MutasaurusConfigInput {
   sourceFiles?: string[];
   testFiles?: string[];
@@ -46,6 +64,12 @@ export interface MutasaurusConfigInput {
   timeout?: number;
 }
 
+/**
+ * The results of the mutation testing process.
+ *
+ * This is both passed to the {@linkcode Reporter} and returned from the
+ * {@linkcode Mutasaurus.run} method.
+ */
 export interface MutasaurusResults {
   totalMutations: number;
   killedMutations: number;
@@ -53,6 +77,15 @@ export interface MutasaurusResults {
   mutations: MutationRun[];
 }
 
+/**
+ * The core responsibility of this class is to orchestrate the mutation testing process.
+ *
+ * It will:
+ * - Expand any file globs in the source and test files.
+ * - Build a list of all possible mutations based off all the supplied files.
+ * - Run the tests against the mutations.
+ * - Generate a report.
+ */
 export class Mutasaurus {
   private config: MutasaurusConfig = {
     sourceFiles: [],
@@ -77,6 +110,7 @@ export class Mutasaurus {
   }
 
   async run(generateReport: boolean = true): Promise<MutasaurusResults> {
+    const startTime = performance.now();
     // Initialize the config asynchronously
     await this.expandFilepathGlobs();
     console.log("Beginning run with config:");
@@ -140,6 +174,9 @@ export class Mutasaurus {
         cleanupError,
       );
     }
+
+    const programEndTime = performance.now();
+    console.log(`Program took ${programEndTime - startTime}ms to run`);
 
     return outcome;
   }

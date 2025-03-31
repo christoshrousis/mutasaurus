@@ -1,7 +1,6 @@
 # Mutasaurus
 
-A Deno-native mutation testing library that helps you improve your test suite quality by
-automatically introducing mutations into your code.
+A Deno mutation testing library that helps you improve your test suite quality by introducing mutations into your code
 
 ## Features
 
@@ -59,6 +58,12 @@ deno task ok
 
 Note: Currently there is only a single E2E test
 
+## Road to V1
+
+- Parity mutation support with StrykerJS.
+- Use coverage reporting to run test suite subset to increase performance.
+- Implement cache system to avoid re-running whats not required.
+
 ## Contributing
 
 To contribute to this project:
@@ -69,22 +74,22 @@ To contribute to this project:
 
 ## Project Goals
 
-This project started as an academic endeavor to explore mutation testing in Deno's ecosystem. The core question was "Can I create a mutation testing library that feels native to Deno?"
+This project started as an academic endeavor to explore mutation testing in Deno's ecosystem. The core question was "Can I create a mutation testing library written in Deno?"
 
 Moving Forward, the guiding principles are:
 
-- **Deno-Native First**
-  - Built exclusively for Deno, leveraging its unique features and security model
+- **Deno-First**
+  - Built exclusively for Deno projects.
   - Should take cues from Deno's overall mission, and align where possible.
 - **Performance-Focused**
-  - Leverages Deno's V8 isolate and Web Workers for parallel execution
+  - Leverages V8 isolate and Web Workers for parallel execution
   - Smart defaults that balance coverage with execution time
   - Configurable mutation patterns for advanced use cases such as exhaustive coverage
   - Potential for Rust-based core components if performance demands it
 - **Developer Experience**
   - Single-command setup and execution out of the box
   - Clear, actionable error messages with Deno-style hints
-  - Comprehensive documentation with Deno-specific examples
+  - Comprehensive documentation with examples
   - Integration with Deno's testing ecosystem
 
 ## License

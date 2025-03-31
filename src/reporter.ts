@@ -1,5 +1,11 @@
 import { MutasaurusResults } from "../mod.ts";
 
+/**
+ * Formats the results of the mutation testing process into a human readable report.
+ *
+ * If a mutation is not killed, it will provide a "sourcemap" style link
+ * that is clickable in the terminal to take the user to the mutation location.
+ */
 export class Reporter {
   formatResults(results: MutasaurusResults): string {
     const { totalMutations, killedMutations, survivedMutations, mutations } =

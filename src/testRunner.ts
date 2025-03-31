@@ -11,9 +11,19 @@
 
 import { MutasaurusConfig, MutationRun } from "../mod.ts";
 
+/**
+ * The result of a test run.
+ *
+ * Contains the original mutation run object,
+ * and reports back on it's status after a test run is complete.
+ */
 export interface TestResult {
   mutation: MutationRun;
-  success: boolean;
+  /** Outcome of the worker process */
+  outcome: "tests-passed" | "tests-failed" | "error";
+  /**
+   * The error that occurred during the test run, if any.
+   */
   error?: string;
   duration: number;
 }

@@ -1,3 +1,17 @@
+/**
+ * worker.ts
+ *
+ * This file is the main entry point for the worker.
+ * It receives a test instruction  from {@linkcode TestRunner.runTests},
+ *
+ * It will create a temporary working directory for the mutation,
+ * copy the source and test files into the working directory,
+ * copy the mutation into the working directory,
+ * and then execute the tests against the mutation.
+ */
+
+import { TestResult } from "./testRunner.ts";
+
 const ensureDirectoryExists = (filePath: string): void => {
   const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
   if (dirPath) {
@@ -6,6 +20,8 @@ const ensureDirectoryExists = (filePath: string): void => {
 };
 
 self.onmessage = async (e) => {
+  const startTime = performance.now();
+
   const { sourceFiles, testFiles, mutation } = e.data;
 
   // Create a temporary working directory for the mutation using absolute path
@@ -35,7 +51,6 @@ self.onmessage = async (e) => {
   ensureDirectoryExists(mutationTargetPath);
   Deno.writeTextFileSync(mutationTargetPath, mutation.mutation);
 
-  const startTime = performance.now();
   try {
     const process = new Deno.Command("deno", {
       args: [
@@ -50,7 +65,6 @@ self.onmessage = async (e) => {
     });
 
     const { code, stderr } = await process.output();
-    const duration = performance.now() - startTime;
 
     const decodedError = new TextDecoder().decode(stderr);
     if (decodedError.includes("Test failed")) {
@@ -58,22 +72,26 @@ self.onmessage = async (e) => {
     } else {
       mutation.status = "survived";
     }
+
+    const duration = performance.now() - startTime;
     mutation.duration = duration;
 
-    self.postMessage(
-      {
-        mutation,
-        success: code === 0,
-        error: code !== 0 ? decodedError : undefined,
-        duration,
-      },
-    );
+    const testResult: TestResult = {
+      mutation,
+      outcome: code === 0 ? "tests-passed" : "tests-failed",
+      duration,
+    };
+    if (code !== 0) testResult.error = decodedError;
+
+    self.postMessage(testResult);
   } catch (error) {
     const duration = performance.now() - startTime;
-    self.postMessage({
-      success: false,
+    const testResult: TestResult = {
+      mutation,
+      outcome: "error",
       error: error instanceof Error ? error.message : String(error),
       duration,
-    });
+    };
+    self.postMessage(testResult);
   }
 };
