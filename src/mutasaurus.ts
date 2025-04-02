@@ -10,9 +10,15 @@ import { TestRunner } from "./testRunner.ts";
  * - `waiting`: The mutation is waiting to be tested.
  * - `killed`: The mutation was killed by the tests.
  * - `survived`: The mutation survived the tests.
- * - `error`: The mutation caused an error to be thrown.
+ * - `timed-out`: The test suite run for the mutation timed out.
+ * - `error`: The worker process running the tests for the mutation caused an error to be thrown.
  */
-export type MutationStatus = "waiting" | "killed" | "survived" | "error";
+export type MutationStatus =
+  | "waiting"
+  | "killed"
+  | "survived"
+  | "timed-out"
+  | "error";
 
 /**
  * A single mutation run, as part of the mutation testing process.
@@ -74,6 +80,8 @@ export interface MutasaurusResults {
   totalMutations: number;
   killedMutations: number;
   survivedMutations: number;
+  erroneousMutations: number;
+  timedOutMutations: number;
   mutations: MutationRun[];
 }
 
@@ -156,10 +164,16 @@ export class Mutasaurus {
       result.filter((result) => result.mutation.status === "killed").length;
     const survivedMutations =
       result.filter((result) => result.mutation.status === "survived").length;
-    const outcome = {
+    const erroneousMutations =
+      result.filter((result) => result.mutation.status === "error").length;
+    const timedOutMutations =
+      result.filter((result) => result.mutation.status === "timed-out").length;
+    const outcome: MutasaurusResults = {
       totalMutations: mutations.length,
       killedMutations,
       survivedMutations,
+      erroneousMutations,
+      timedOutMutations,
       mutations: result.map((result) => result.mutation),
     };
     if (generateReport) {

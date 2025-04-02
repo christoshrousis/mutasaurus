@@ -1,6 +1,6 @@
 {
   "name": "@mutasaurus/mutasaurus",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "exports": "./mod.ts",
   "tasks": {
     "fmt": "deno fmt",

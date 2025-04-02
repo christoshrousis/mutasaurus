@@ -8,8 +8,14 @@ import { MutasaurusResults } from "../mod.ts";
  */
 export class Reporter {
   formatResults(results: MutasaurusResults): string {
-    const { totalMutations, killedMutations, survivedMutations, mutations } =
-      results;
+    const {
+      totalMutations,
+      killedMutations,
+      survivedMutations,
+      timedOutMutations,
+      erroneousMutations,
+      mutations,
+    } = results;
     const mutationScore = (killedMutations / totalMutations) * 100;
 
     let output = "\nMutation Testing Report\n";
@@ -37,6 +43,8 @@ export class Reporter {
     output += `Total Mutations: ${totalMutations}\n`;
     output += `Killed Mutations: ${killedMutations}\n`;
     output += `Survived Mutations: ${survivedMutations}\n`;
+    output += `Timed-out Mutations: ${timedOutMutations}\n`;
+    output += `Erroneous Mutations: ${erroneousMutations}\n`;
     output += `Mutation Score: ${mutationScore.toFixed(2)}%\n\n`;
 
     return output;

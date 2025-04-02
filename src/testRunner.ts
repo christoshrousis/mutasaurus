@@ -20,7 +20,7 @@ import { MutasaurusConfig, MutationRun } from "../mod.ts";
 export interface TestResult {
   mutation: MutationRun;
   /** Outcome of the worker process */
-  outcome: "tests-passed" | "tests-failed" | "error";
+  outcome: "tests-passed" | "tests-failed" | "timed-out" | "error";
   /**
    * The error that occurred during the test run, if any.
    */
@@ -71,11 +71,18 @@ export class TestRunner {
 
       activeWorkers.add(worker);
       try {
-        const result = await new Promise<TestResult>((resolve, reject) => {
+        const result = await new Promise<TestResult>((resolve) => {
           const timeoutId = setTimeout(() => {
-            reject(
-              new Error(`Test execution timed out after ${this.timeout}ms`),
-            );
+            const timedOutResult: TestResult = {
+              mutation: {
+                ...mutation,
+                status: "timed-out",
+                duration: this.timeout,
+              },
+              outcome: "timed-out",
+              duration: this.timeout,
+            };
+            resolve(timedOutResult);
           }, this.timeout);
 
           worker!.onmessage = (e: { data: TestResult }) => {
@@ -85,7 +92,17 @@ export class TestRunner {
 
           worker!.onerror = (error) => {
             clearTimeout(timeoutId);
-            reject(error);
+            const errorResult: TestResult = {
+              mutation: {
+                ...mutation,
+                status: "error",
+                duration: 0,
+              },
+              outcome: "error",
+              error: error instanceof Error ? error.message : String(error),
+              duration: 0,
+            };
+            resolve(errorResult);
           };
 
           worker!.postMessage({ sourceFiles, testFiles, mutation });

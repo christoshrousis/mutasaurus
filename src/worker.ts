@@ -2,7 +2,7 @@
  * worker.ts
  *
  * This file is the main entry point for the worker.
- * It receives a test instruction  from {@linkcode TestRunner.runTests},
+ * It receives a test instruction from {@linkcode TestRunner.runTests},
  *
  * It will create a temporary working directory for the mutation,
  * copy the source and test files into the working directory,
