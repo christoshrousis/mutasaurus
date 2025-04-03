@@ -5,7 +5,7 @@
   "tasks": {
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "ok": "deno test --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/ok.test.ts"
+    "ok": "deno test --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/ok.test.ts && deno publish --dry-run"
   },
   "fmt": {
     "include": [

@@ -28,7 +28,70 @@ console.log(results);
 
 ## Configuration
 
-TODO [Detailed configuration options]
+#### Source files & Test Files
+The suggestion at the time is to supply a list of source files to mutate, and
+corresponding list of test files.
+
+The parameters accept glob patterns.
+
+Be mindful, that all test files in `testFiles` will run against a single mutation,
+so performance is not linear.
+
+Let `m` be the number of possible mutations
+Let `t` be the number of test files
+Let `s` be the number of source files
+
+For each mutation that's created `m`, we need to run every test file `t` against it. This creates a multiplicative relationship:
+`O(m × t)`
+
+However,  the number of possible mutations `m` is also dependent on the number of source files `s` and the number of possible mutation points within each source file. 
+If we consider `p` as the average number of possible mutation points per source file, then:
+`m = s × p`
+
+Therefore, the total complexity relationship could be defined as:
+`O(s × p × t)`
+
+All this is to say, if you define the relationships between the source files and the test files, you can improve the speed of
+the mutation test harness.
+
+So this:
+
+```typescript
+const featureAMutations = new Mutasaurus({
+  sourceFiles: ['./src/a/1.ts', './src/a/2.ts', './src/a/3.ts'],
+  testFiles: ['./tests/a/1.test.ts', './tests/a/2.test.ts'],
+});
+const featureBMutations = new Mutasaurus({
+  sourceFiles: ['./src/b/1.ts', './src/b/2.ts', './src/b/3.ts'],
+  testFiles: ['./tests/b/1.test.ts', './tests/b/2.test.ts'],
+});
+const resultsA = await featureAMutations.run();
+const resultsB = await featureBMutations.run();
+
+```
+
+will perform better than this:
+
+```typescript
+const mutasaurus = new Mutasaurus({
+  sourceFiles: ['./src/**/*.ts'],
+  testFiles: ['./tests/**/*.test.ts'],
+});
+const results = await mutasaurus.run();
+```
+
+#### Exhaustive Mode
+The test suite will only run a subset of cherry picked mutations that attempt to balance speed & accuracy.
+If you suspect you want to run all possible permutations, you can pass a `exhaustiveMode: true` to 
+Mutasaurus constructor to increase the number of mutants.
+
+```typescript
+const mutasaurus = new Mutasaurus({
+  exhaustiveMode: true
+});
+```
+
+This will increase the `p` in `O(s × p × t)`
 
 ## Examples
 

@@ -47,12 +47,20 @@ export interface MutasaurusConfig {
   sourceFiles: string[];
   /** Files identified as test files to be run against the mutations. */
   testFiles: string[];
-  /** The operators to be used for the mutations. TODO: Define the operators instead of using strings*/
+  /** The operators to be used for the mutations. TODO: Define the operators instead of using strings */
   operators: string[];
   /** The number of workers to be used when creating worker pools to run the tests against the mutations. */
   workers: number;
-  /** The timeout for the individual workers in the worker pools.. */
+  /** The timeout for the individual workers in the worker pools. */
   timeout: number;
+  /** Whether to execute as many possible permutations as possible. Defaults to false.
+   *
+   * Instead of the Mutsaurus curated subset of mutations, this will run all possible mutations.
+   * This may or may not be better suited to individual files or functions, where you want to test all possible mutations.
+   *
+   * TODO: Improve granularity by allowing users to provide their own mutation mappings?
+   */
+  exhaustiveMode: boolean;
 }
 
 /**
@@ -61,6 +69,8 @@ export interface MutasaurusConfig {
  *
  * This allows the end user to optionally supply a subset of configuration,
  * while allowing us to set a default.
+ *
+ * Please refer to {@linkcode MutasaurusConfig} for additional information.
  */
 export interface MutasaurusConfigInput {
   sourceFiles?: string[];
@@ -68,6 +78,7 @@ export interface MutasaurusConfigInput {
   operators?: string[];
   workers?: number;
   timeout?: number;
+  exhaustiveMode?: boolean;
 }
 
 /**
@@ -101,6 +112,7 @@ export class Mutasaurus {
     operators: ["arithmetic", "logical", "control"],
     workers: 4,
     timeout: 5000,
+    exhaustiveMode: false,
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -112,7 +124,7 @@ export class Mutasaurus {
       ...config,
     };
 
-    this.mutator = new Mutator();
+    this.mutator = new Mutator(this.config.exhaustiveMode);
     this.reporter = new Reporter();
     this.testRunner = new TestRunner(this.config.workers, this.config.timeout);
   }

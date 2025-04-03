@@ -71,6 +71,42 @@ const arithmeticOperators: Record<
   BinaryOperator,
   Array<BinaryOperator>
 > = {
+  "+": ["*"],
+  "-": ["/"],
+  "*": ["-"],
+  "/": ["+"],
+  "%": ["+"],
+  "**": ["+"],
+  "<<": [],
+  ">>": [],
+  ">>>": [],
+  "|": [],
+  "^": [],
+  "&": [],
+
+  "in": [],
+  "instanceof": [],
+
+  "==": ["!=="],
+  "!=": ["==="],
+  "===": ["!="],
+  "!==": ["=="],
+
+  "<": [">="],
+  "<=": [">"],
+  ">": ["<="],
+  ">=": ["<"],
+} as const;
+
+/**
+ * The configuration object of how to mutate a particular arithmetic operator.
+ *
+ * E.g. '+' is mutated to "-", "*" & "/", and .\
+ */
+const arithmeticOperatorsExhaustive: Record<
+  BinaryOperator,
+  Array<BinaryOperator>
+> = {
   "+": ["-", "*", "/"],
   "-": ["+", "*", "/"],
   "*": ["+", "-", "/"],
@@ -99,20 +135,38 @@ const arithmeticOperators: Record<
 } as const;
 
 /**
- * Checks if an operator is supported for arithmetic mutations.
+ * The configuration object of how to mutate a particular assignment operator.
+ *
+ * E.g. '=' is only mutated to '+='. and '+=' is mutated to "=", "-=", "*=" & "/=".
  */
-const isSupportedArithmeticOperator = (
-  operator: BinaryOperator,
-): operator is keyof typeof arithmeticOperators => {
-  return operator in arithmeticOperators;
-};
+const assignmentOperators: Record<
+  AssignmentOperator,
+  Array<AssignmentOperator>
+> = {
+  "=": ["+="],
+  "+=": ["/="],
+  "-=": ["*="],
+  "*=": ["-="],
+  "/=": ["+="],
+  "%=": ["="],
+  "**=": ["-="],
+  "<<=": ["="],
+  ">>=": ["="],
+  ">>>=": ["="],
+  "|=": ["="],
+  "^=": ["="],
+  "&=": ["="],
+  "||=": ["="],
+  "&&=": ["="],
+  "??=": ["="],
+} as const;
 
 /**
  * The configuration object of how to mutate a particular assignment operator.
  *
  * E.g. '=' is only mutated to '+='. and '+=' is mutated to "=", "-=", "*=" & "/=".
  */
-const assignmentOperators: Record<
+const assignmentOperatorsExhaustive: Record<
   AssignmentOperator,
   Array<AssignmentOperator>
 > = {
@@ -135,37 +189,36 @@ const assignmentOperators: Record<
 } as const;
 
 /**
- * Checks if an operator is supported for assignment mutations.
- */
-const isSupportedAssignmentOperator = (
-  operator: AssignmentOperator,
-): operator is keyof typeof assignmentOperators => {
-  return operator in assignmentOperators;
-};
-
-/**
  * The Mutator is responsible for generating a list of mutations for a given source file.
  *
  * It will parse the source file using OXC, and for each node that is a binary expression or an assignment expression,
  * it will generate a list of mutations.
  */
 export class Mutator {
-  constructor() {}
+  private exhaustiveMode: boolean;
+
+  constructor(exhaustiveMode: boolean) {
+    this.exhaustiveMode = exhaustiveMode;
+  }
 
   generateMutationsList(content: string, filePath: string): Mutation[] {
     const fileName = filePath.split("/").pop()!;
     const mutations: Mutation[] = [];
+    const exhaustiveMode = this.exhaustiveMode;
 
     parseAndWalk(content, fileName, {
       enter(node: Node) {
         switch (node.type) {
           case "BinaryExpression":
-            if (isSupportedArithmeticOperator(node.operator)) {
+            {
               const start = node.left.end;
               const end = node.right.start;
+              const operators = exhaustiveMode
+                ? arithmeticOperatorsExhaustive
+                : arithmeticOperators;
 
               for (
-                const operator of arithmeticOperators[node.operator]
+                const operator of operators[node.operator]
               ) {
                 const mutation: BinaryExpressionMutation = {
                   operator,
@@ -179,12 +232,15 @@ export class Mutator {
             }
             break;
           case "AssignmentExpression":
-            if (isSupportedAssignmentOperator(node.operator)) {
+            {
               const start = node.left.end;
               const end = node.right.start;
+              const operators = exhaustiveMode
+                ? assignmentOperatorsExhaustive
+                : assignmentOperators;
 
               for (
-                const operator of assignmentOperators[node.operator]
+                const operator of operators[node.operator]
               ) {
                 const mutation: AssignmentExpressionMutation = {
                   operator,
