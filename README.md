@@ -7,7 +7,7 @@ A Deno mutation testing library that helps you improve your test suite quality b
 - 🦕 Deno-first approach
 - ⚡ High performance
 - 📊 Mutation coverage reporting
-- 🎯 Configurable mutation operators
+- 🎯 Configurable mutation operators (TBD)
 - 🔍 Source map support for accurate error reporting
 
 ## Quick Start
@@ -15,12 +15,7 @@ A Deno mutation testing library that helps you improve your test suite quality b
 ```typescript
 import { Mutasaurus } from 'jsr:@mutasaurus/mutasaurus';
 
-const mutasaurus = new Mutasaurus({
-  sourceFiles: ['./src/**/*.ts'],
-  testFiles: ['./tests/**/*.test.ts'],
-  operators: ['arithmetic', 'logical', 'control'],
-  workers: 4,
-});
+const mutasaurus = new Mutasaurus();
 
 const results = await mutasaurus.run();
 console.log(results);
@@ -28,14 +23,17 @@ console.log(results);
 
 ## Configuration
 
+When starting, you will want to pass no configuration to Mutasaurus.
+By not passing sourceFiles, mutasaurus will proceed to search for source and
+test file configurations on it's own.
+
 #### Source files & Test Files
-The suggestion at the time is to supply a list of source files to mutate, and
-corresponding list of test files.
+When supplying source files and test files, mutasaurus will consider the
+provided files as the only files it's allowed to work with.
 
 The parameters accept glob patterns.
 
-Be mindful, that all test files in `testFiles` will run against a single mutation,
-so performance is not linear.
+Something to consider:
 
 Let `m` be the number of possible mutations
 Let `t` be the number of test files
@@ -44,7 +42,7 @@ Let `s` be the number of source files
 For each mutation that's created `m`, we need to run every test file `t` against it. This creates a multiplicative relationship:
 `O(m × t)`
 
-However,  the number of possible mutations `m` is also dependent on the number of source files `s` and the number of possible mutation points within each source file. 
+However, the number of possible mutations `m` is also dependent on the number of source files `s` and the number of possible mutation points within each source file. 
 If we consider `p` as the average number of possible mutation points per source file, then:
 `m = s × p`
 
@@ -92,6 +90,16 @@ const mutasaurus = new Mutasaurus({
 ```
 
 This will increase the `p` in `O(s × p × t)`
+
+#### Workers
+Mutasaurus uses workers, to take advantage of parallel execution.
+This will default to 4, but depending on your machine's cores and logical cores,
+you may or may not see improvements if you alter this number.
+
+#### Timeout
+The amount of time you should allow a runner to go, before considering it
+"timed-out". Note, that some mutations can cause infinite evaluations,
+so it is suggested you don't set an arbitrarily large number here.
 
 ## Examples
 

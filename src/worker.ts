@@ -10,6 +10,8 @@
  * and then execute the tests against the mutation.
  */
 
+import { SourceFile, TestFile } from "./findSourceAndTestFiles.ts";
+import { MutationRun } from "./mutasaurus.ts";
 import { TestResult } from "./testRunner.ts";
 
 const ensureDirectoryExists = (filePath: string): void => {
@@ -19,10 +21,18 @@ const ensureDirectoryExists = (filePath: string): void => {
   }
 };
 
-self.onmessage = async (e) => {
+self.onmessage = async (
+  e: {
+    data: {
+      mutation: MutationRun;
+      sourceFiles: SourceFile[];
+      testFiles: TestFile[];
+    };
+  },
+) => {
   const startTime = performance.now();
 
-  const { sourceFiles, testFiles, mutation } = e.data;
+  const { mutation, sourceFiles, testFiles } = e.data;
 
   // Create a temporary working directory for the mutation using absolute path
   const workingDirectory = `${Deno.cwd()}/.mutasaurus/${
@@ -30,26 +40,28 @@ self.onmessage = async (e) => {
   }`;
   Deno.mkdirSync(workingDirectory, { recursive: true });
 
-  // Copy all source and test files into the working directory
-  for (const sourceFile of sourceFiles) {
-    const content = await Deno.readTextFile(sourceFile);
-    const targetPath = `${workingDirectory}/${sourceFile}`;
+  for (const testFile of testFiles) {
+    const targetPath = `${workingDirectory}/${testFile.relativePath}`;
     ensureDirectoryExists(targetPath);
-    Deno.writeTextFileSync(targetPath, content);
+    await Deno.copyFile(testFile.path, targetPath);
   }
 
-  for (const testFile of testFiles) {
-    const content = await Deno.readTextFile(testFile);
-    const targetPath = `${workingDirectory}/${testFile}`;
+  for (const sourceFile of sourceFiles) {
+    const targetPath = `${workingDirectory}/${sourceFile.relativePath}`;
     ensureDirectoryExists(targetPath);
-    Deno.writeTextFileSync(targetPath, content);
+    await Deno.copyFile(sourceFile.path, targetPath);
   }
 
   // Copy the mutation into the working directory
   const mutationTargetPath =
-    `${workingDirectory}/${mutation.original.filePath}`;
+    `${workingDirectory}/${mutation.original.relativePath}`;
   ensureDirectoryExists(mutationTargetPath);
   Deno.writeTextFileSync(mutationTargetPath, mutation.mutation);
+
+  // Prepare test files to run list
+  const testFilesToRun = mutation.testFilesToRun.map((testFile) =>
+    `${workingDirectory}/${testFile}`
+  );
 
   try {
     const process = new Deno.Command("deno", {
@@ -58,7 +70,7 @@ self.onmessage = async (e) => {
         "--allow-read",
         "--allow-write",
         "--allow-run",
-        workingDirectory,
+        ...testFilesToRun,
       ],
       stdout: "piped",
       stderr: "piped",
@@ -67,6 +79,7 @@ self.onmessage = async (e) => {
     const { code, stderr } = await process.output();
 
     const decodedError = new TextDecoder().decode(stderr);
+
     if (decodedError.includes("Test failed")) {
       mutation.status = "killed";
     } else {

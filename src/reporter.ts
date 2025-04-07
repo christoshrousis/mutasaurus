@@ -31,7 +31,7 @@ export class Reporter {
             r.original.content,
             r.start,
           );
-          output += `File: ${r.original.filePath}:${line}:${column}\n`;
+          output += `File: ${r.original.relativePath}:${line}:${column}\n`;
           output += `Operator: ${r.operator}\n`;
 
           output += "\n";

@@ -1,8 +1,12 @@
-import { expandGlob } from "@std/fs";
-
 import { Mutator } from "./mutator.ts";
 import { Reporter } from "./reporter.ts";
 import { TestRunner } from "./testRunner.ts";
+import {
+  findSourceAndTestFiles,
+  findSourceAndTestFilesFromGlobLists,
+  SourceFile,
+  TestFile,
+} from "./findSourceAndTestFiles.ts";
 
 /**
  * The different states that a MutationRun can be in, as part of the mutation testing process.
@@ -27,11 +31,13 @@ export type MutationStatus =
  * from waiting, implying that the mutation is identified, to killed or survived,
  * implying that the mutation has been tested and it's result is known.
  */
+
 export type MutationRun = {
   original: {
-    filePath: string;
+    relativePath: string;
     content: string;
   };
+  testFilesToRun: string[];
   mutation: string;
   operator: string;
   start: number;
@@ -118,7 +124,10 @@ export class Mutasaurus {
   private reporter: Reporter;
   private testRunner: TestRunner;
 
-  constructor(config: MutasaurusConfigInput) {
+  private sourceFiles: SourceFile[] = [];
+  private testFiles: TestFile[] = [];
+
+  constructor(config?: MutasaurusConfigInput) {
     this.config = {
       ...this.config,
       ...config,
@@ -131,47 +140,39 @@ export class Mutasaurus {
 
   async run(generateReport: boolean = true): Promise<MutasaurusResults> {
     const startTime = performance.now();
-    // Initialize the config asynchronously
-    await this.expandFilepathGlobs();
-    console.log("Beginning run with config:");
+
+    const sourceFilesProvided = this.config.sourceFiles.length !== 0;
+
+    // Print opening statement.
+    console.log("\n---------------------------------\n");
+    console.log("Running Mutasaurus, with the following config...");
     console.log(this.config);
 
-    // Build a list of all possible mutations based off all the supplied files.
-    const mutations: MutationRun[] = [];
-    for (const sourceFile of this.config.sourceFiles) {
-      const content = await Deno.readTextFile(sourceFile);
-      const fileMutations = this.mutator.generateMutationsList(
-        content,
-        sourceFile,
+    if (!sourceFilesProvided) {
+      console.log("\n---------------------------------\n");
+      console.log(
+        "Source files not provided, will search for source and test files in the current working directory",
       );
-
-      for (const mutation of fileMutations) {
-        // TODO: This operation probably resides elsewhere.
-        let modifiedContent = content;
-        modifiedContent = modifiedContent.slice(0, mutation.location.start) +
-          ` ${mutation.operator} ` +
-          modifiedContent.slice(mutation.location.end);
-        mutations.push({
-          original: {
-            filePath: sourceFile,
-            content,
-          },
-          mutation: modifiedContent,
-          operator: mutation.operator,
-          start: mutation.location.start,
-          status: "waiting",
-          duration: 0,
-        });
-      }
     }
+    console.log("\n---------------------------------\n\n");
 
-    // TODO: There is a way to only run the tests that are needed, based off the coverage report.
-    // TODO: Errors may occur in this loop, but we don't handle them.
-    const result = await this.testRunner.runTests({
+    // Set source and test files.
+    const { sourceFiles, testFiles } = sourceFilesProvided
+      ? await findSourceAndTestFilesFromGlobLists(
+        this.config.sourceFiles,
+        this.config.testFiles,
+      )
+      : await findSourceAndTestFiles();
+    this.sourceFiles = sourceFiles;
+    this.testFiles = testFiles;
+
+    const mutations = await this.generateMutations();
+    const result = await this.testRunner.runTests(
       mutations,
-      sourceFiles: this.config.sourceFiles,
-      testFiles: this.config.testFiles,
-    });
+      this.sourceFiles,
+      this.testFiles,
+    );
+
     const killedMutations =
       result.filter((result) => result.mutation.status === "killed").length;
     const survivedMutations =
@@ -179,7 +180,8 @@ export class Mutasaurus {
     const erroneousMutations =
       result.filter((result) => result.mutation.status === "error").length;
     const timedOutMutations =
-      result.filter((result) => result.mutation.status === "timed-out").length;
+      result.filter((result) => result.mutation.status === "timed-out")
+        .length;
     const outcome: MutasaurusResults = {
       totalMutations: mutations.length,
       killedMutations,
@@ -207,35 +209,42 @@ export class Mutasaurus {
     return outcome;
   }
 
-  private async expandFilepathGlobs(): Promise<void> {
-    // Expand glob patterns in sourceFiles and testFiles
-    const expandedSourceFiles: string[] = [];
-    const expandedTestFiles: string[] = [];
+  private async generateMutations(): Promise<MutationRun[]> {
+    const sourceFileToTestFileCoverage = await this.testRunner
+      .initialTestRunsWithCoverage({
+        sourceFiles: this.sourceFiles,
+        testFiles: this.testFiles,
+      });
 
-    // Expand source files
-    for (const pattern of this.config.sourceFiles) {
-      for await (const file of expandGlob(pattern)) {
-        expandedSourceFiles.push(file.path);
+    // Build a list of all possible mutations based off all the supplied files.
+    const mutations: MutationRun[] = [];
+    for (const sourceFile of sourceFileToTestFileCoverage.keys()) {
+      const testFilesToRun = sourceFileToTestFileCoverage.get(sourceFile) ?? [];
+      const content = await Deno.readTextFile(`${Deno.cwd()}${sourceFile}`);
+      const fileMutations = this.mutator.generateMutationsList(
+        content,
+        sourceFile,
+      );
+      for (const mutation of fileMutations) {
+        // TODO: This operation probably resides elsewhere.
+        let modifiedContent = content;
+        modifiedContent = modifiedContent.slice(0, mutation.location.start) +
+          ` ${mutation.operator} ` +
+          modifiedContent.slice(mutation.location.end);
+        mutations.push({
+          original: {
+            relativePath: sourceFile,
+            content,
+          },
+          testFilesToRun,
+          mutation: modifiedContent,
+          operator: mutation.operator,
+          start: mutation.location.start,
+          status: "waiting",
+          duration: 0,
+        });
       }
     }
-
-    // Expand test files
-    for (const pattern of this.config.testFiles) {
-      for await (const file of expandGlob(pattern)) {
-        expandedTestFiles.push(file.path);
-      }
-    }
-
-    // Remove any test files from the source files list
-    const filteredSourceFiles = expandedSourceFiles.filter(
-      (sourceFile) => !expandedTestFiles.includes(sourceFile),
-    );
-
-    // Update the config with expanded files
-    this.config = {
-      ...this.config,
-      sourceFiles: filteredSourceFiles,
-      testFiles: expandedTestFiles,
-    };
+    return mutations;
   }
 }

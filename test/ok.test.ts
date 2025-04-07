@@ -2,7 +2,18 @@ import { assertEquals } from "@std/assert";
 
 import { Mutasaurus } from '../mod.ts';
 
-Deno.test("given a non-exhaustive run", async () => {
+Deno.test("given an un-configured run", async () => {
+  const mutasaurus = new Mutasaurus();
+  const outcome = await mutasaurus.run();
+
+  assertEquals(outcome.totalMutations, 9, "Total mutations should be 9");
+  assertEquals(outcome.killedMutations, 7, "Killed mutations should be 7");
+  assertEquals(outcome.survivedMutations, 1, "Survived mutations should be 1");
+  assertEquals(outcome.timedOutMutations, 1, "Timed-out mutations should be 1");
+  assertEquals(outcome.erroneousMutations, 0, "Erroneous mutations should be 0");
+})
+
+Deno.test("given a non-exhaustive, configured run", async () => {
   const mutasaurus = new Mutasaurus({
     sourceFiles: ['test/fixtures/*.ts'],
     testFiles: ['test/fixtures/*.test.ts'],
@@ -27,7 +38,7 @@ Deno.test("given a non-exhaustive run", async () => {
   });
 })
 
-Deno.test("given an exhaustive run", async () => {
+Deno.test("given an exhaustive, configured run", async () => {
   const mutasaurus = new Mutasaurus({
     sourceFiles: ['test/fixtures/*.ts'],
     testFiles: ['test/fixtures/*.test.ts'],

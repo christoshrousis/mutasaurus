@@ -9,7 +9,24 @@
  * Main thread receives results and resolves the promise
  */
 
-import { MutasaurusConfig, MutationRun } from "../mod.ts";
+import { expandGlob } from "@std/fs";
+import { MutationRun } from "../mod.ts";
+
+type File = {
+  path: string;
+  relativePath: string;
+  content: string;
+};
+
+type SourceFile = File;
+type TestFile = File;
+
+const ensureDirectoryExists = (filePath: string): void => {
+  const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
+  if (dirPath) {
+    Deno.mkdirSync(dirPath, { recursive: true });
+  }
+};
 
 /**
  * The result of a test run.
@@ -29,6 +46,7 @@ export interface TestResult {
 }
 
 export class TestRunner {
+  // Configuration helpers.
   private workers: number;
   private timeout: number;
 
@@ -37,15 +55,11 @@ export class TestRunner {
     this.timeout = timeout;
   }
 
-  async runTests({
-    mutations,
-    sourceFiles,
-    testFiles,
-  }: {
-    mutations: MutationRun[];
-    sourceFiles: MutasaurusConfig["sourceFiles"];
-    testFiles: MutasaurusConfig["testFiles"];
-  }): Promise<TestResult[]> {
+  async runTests(
+    mutations: MutationRun[],
+    sourceFiles: SourceFile[],
+    testFiles: TestFile[],
+  ): Promise<TestResult[]> {
     const results: TestResult[] = [];
     const workerPool = Array.from(
       { length: this.workers },
@@ -105,9 +119,11 @@ export class TestRunner {
             resolve(errorResult);
           };
 
-          worker!.postMessage({ sourceFiles, testFiles, mutation });
+          worker!.postMessage({ mutation, sourceFiles, testFiles });
         });
         results.push(result);
+      } catch (error) {
+        console.error(error);
       } finally {
         activeWorkers.delete(worker);
       }
@@ -117,6 +133,97 @@ export class TestRunner {
     // Clean up all workers
     workerPool.forEach((worker) => worker.terminate());
     return results;
+  }
+
+  public async initialTestRunsWithCoverage({
+    sourceFiles,
+    testFiles,
+  }: {
+    sourceFiles: SourceFile[];
+    testFiles: TestFile[];
+  }): Promise<
+    Map<SourceFile["relativePath"], Array<TestFile["relativePath"]>>
+  > {
+    const sourceFileToTestFileCoverage = new Map<
+      SourceFile["relativePath"],
+      Array<TestFile["relativePath"]>
+    >();
+    const currentWorkingDirectory = Deno.cwd();
+
+    // Create a working directory for the test file, with the test file name for traceability.
+    const workingDirectory =
+      `${currentWorkingDirectory}/.mutasaurus/initialTestRunWithCoverage-${
+        Math.random().toString(36).substring(7)
+      }`;
+    Deno.mkdirSync(workingDirectory, { recursive: true });
+
+    /**
+     * Copy all test files into the working directory
+     */
+    for (const testFile of testFiles) {
+      const testFilePath = `${workingDirectory}/${testFile.relativePath}`;
+      ensureDirectoryExists(testFilePath);
+      Deno.writeTextFileSync(testFilePath, testFile.content);
+    }
+
+    /**
+     * Copy all source files into the working directory
+     */
+    for (const sourceFile of sourceFiles) {
+      const sourceFilePath = `${workingDirectory}/${sourceFile.relativePath}`;
+      ensureDirectoryExists(sourceFilePath);
+      Deno.writeTextFileSync(sourceFilePath, sourceFile.content);
+    }
+
+    /**
+     * Run test suite with coverage, on a per test file basis to get coverage
+     * of each individual source file.
+     */
+    for (const testFile of testFiles) {
+      const testFilePath = `${workingDirectory}/${testFile.relativePath}`;
+      const coveragePath =
+        `${workingDirectory}/coverage${testFile.relativePath}/`;
+      const process = new Deno.Command("deno", {
+        args: [
+          "test",
+          "--allow-read",
+          "--allow-write",
+          "--allow-run",
+          `--coverage=${coveragePath}`,
+          testFilePath,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      await process.output();
+      // read each json file in the coverage path, and parse it as json
+      const coverageFiles = await expandGlob(`${coveragePath}/**/*.json`);
+      for await (const file of coverageFiles) {
+        const coverageFile = await Deno.readTextFile(file.path);
+        const coverage = JSON.parse(coverageFile);
+        const coverageFilePath = coverage.url.replace("file://", "");
+        const coverageRelativePath = coverageFilePath.replace(
+          workingDirectory,
+          "",
+        );
+
+        const isASourceFile = sourceFiles.some((sourceFile) =>
+          sourceFile.relativePath === coverageRelativePath
+        );
+        if (isASourceFile) {
+          const currentCoverage =
+            sourceFileToTestFileCoverage.get(coverageRelativePath) ?? [];
+          currentCoverage.push(testFile.relativePath);
+          sourceFileToTestFileCoverage.set(
+            coverageRelativePath,
+            currentCoverage,
+          );
+        }
+      }
+    }
+
+    return sourceFileToTestFileCoverage;
   }
 
   private createWorker(): Worker {

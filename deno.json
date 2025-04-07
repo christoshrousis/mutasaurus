@@ -1,10 +1,12 @@
 {
   "name": "@mutasaurus/mutasaurus",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "exports": "./mod.ts",
   "tasks": {
+    "clean": "rm -rf ./.mutasaurus %% rm -rf ./coverage",
     "fmt": "deno fmt",
     "lint": "deno lint",
+    "fixtures": "deno test --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/fixtures/",
     "ok": "deno test --allow-read --allow-write --allow-run --allow-env --allow-ffi ./test/ok.test.ts && deno publish --dry-run"
   },
   "fmt": {
