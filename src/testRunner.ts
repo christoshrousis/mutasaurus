@@ -59,6 +59,7 @@ export class TestRunner {
     mutations: MutationRun[],
     sourceFiles: SourceFile[],
     testFiles: TestFile[],
+    workingDirectoryIn: string,
   ): Promise<TestResult[]> {
     const results: TestResult[] = [];
     const workerPool = Array.from(
@@ -119,7 +120,12 @@ export class TestRunner {
             resolve(errorResult);
           };
 
-          worker!.postMessage({ mutation, sourceFiles, testFiles });
+          worker!.postMessage({
+            mutation,
+            sourceFiles,
+            testFiles,
+            workingDirectoryIn,
+          });
         });
         results.push(result);
       } catch (error) {
@@ -138,9 +144,11 @@ export class TestRunner {
   public async initialTestRunsWithCoverage({
     sourceFiles,
     testFiles,
+    workingDirectoryIn,
   }: {
     sourceFiles: SourceFile[];
     testFiles: TestFile[];
+    workingDirectoryIn: string;
   }): Promise<
     Map<SourceFile["relativePath"], Array<TestFile["relativePath"]>>
   > {
@@ -148,7 +156,7 @@ export class TestRunner {
       SourceFile["relativePath"],
       Array<TestFile["relativePath"]>
     >();
-    const currentWorkingDirectory = Deno.cwd();
+    const currentWorkingDirectory = workingDirectoryIn;
 
     // Create a working directory for the test file, with the test file name for traceability.
     const workingDirectory =

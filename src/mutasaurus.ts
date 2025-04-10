@@ -67,6 +67,8 @@ export interface MutasaurusConfig {
    * TODO: Improve granularity by allowing users to provide their own mutation mappings?
    */
   exhaustiveMode: boolean;
+  /** When the root directory where mutasaurus is run from, is not the root of the project you want to test, you can provide the path to the project root here. */
+  workingDirectory: string;
 }
 
 /**
@@ -85,7 +87,7 @@ export interface MutasaurusConfigInput {
   workers?: number;
   timeout?: number;
   exhaustiveMode?: boolean;
-  silent?: boolean;
+  workingDirectory?: string;
 }
 
 /**
@@ -129,6 +131,7 @@ export class Mutasaurus {
     workers: 4,
     timeout: 5000,
     exhaustiveMode: false,
+    workingDirectory: Deno.cwd(),
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -148,7 +151,10 @@ export class Mutasaurus {
     this.testRunner = new TestRunner(this.config.workers, this.config.timeout);
   }
 
-  async run(generateReport: boolean = true, reportOutputPath?: string): Promise<MutasaurusResultsReturn> {
+  async run(
+    generateReport: boolean = true,
+    reportOutputPath?: string,
+  ): Promise<MutasaurusResultsReturn> {
     const startTime = performance.now();
 
     const sourceFilesProvided = this.config.sourceFiles.length !== 0;
@@ -173,8 +179,9 @@ export class Mutasaurus {
       ? await findSourceAndTestFilesFromGlobLists(
         this.config.sourceFiles,
         this.config.testFiles,
+        this.config.workingDirectory,
       )
-      : await findSourceAndTestFiles();
+      : await findSourceAndTestFiles(this.config.workingDirectory);
     this.sourceFiles = sourceFiles;
     this.testFiles = testFiles;
 
@@ -183,6 +190,7 @@ export class Mutasaurus {
       mutations,
       this.sourceFiles,
       this.testFiles,
+      this.config.workingDirectory,
     );
 
     const killedMutations =
@@ -231,13 +239,16 @@ export class Mutasaurus {
       .initialTestRunsWithCoverage({
         sourceFiles: this.sourceFiles,
         testFiles: this.testFiles,
+        workingDirectoryIn: this.config.workingDirectory,
       });
 
     // Build a list of all possible mutations based off all the supplied files.
     const mutations: MutationRun[] = [];
     for (const sourceFile of sourceFileToTestFileCoverage.keys()) {
       const testFilesToRun = sourceFileToTestFileCoverage.get(sourceFile) ?? [];
-      const content = await Deno.readTextFile(`${Deno.cwd()}${sourceFile}`);
+      const content = await Deno.readTextFile(
+        `${this.config.workingDirectory}${sourceFile}`,
+      );
       const fileMutations = this.mutator.generateMutationsList(
         content,
         sourceFile,

@@ -27,15 +27,16 @@ self.onmessage = async (
       mutation: MutationRun;
       sourceFiles: SourceFile[];
       testFiles: TestFile[];
+      workingDirectoryIn: string;
     };
   },
 ) => {
   const startTime = performance.now();
 
-  const { mutation, sourceFiles, testFiles } = e.data;
+  const { mutation, sourceFiles, testFiles, workingDirectoryIn } = e.data;
 
   // Create a temporary working directory for the mutation using absolute path
-  const workingDirectory = `${Deno.cwd()}/.mutasaurus/${
+  const workingDirectory = `${workingDirectoryIn}/.mutasaurus/${
     Math.random().toString(36).substring(7)
   }`;
   Deno.mkdirSync(workingDirectory, { recursive: true });

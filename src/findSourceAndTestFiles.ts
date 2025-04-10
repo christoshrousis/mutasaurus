@@ -32,13 +32,15 @@ export type SourceFile = File;
  */
 export type TestFile = File;
 
-export const findSourceAndTestFiles = async (): Promise<
+export const findSourceAndTestFiles = async (
+  workingDirectoryIn: string,
+): Promise<
   {
     sourceFiles: SourceFile[];
     testFiles: TestFile[];
   }
 > => {
-  const currentWorkingDirectory = Deno.cwd();
+  const currentWorkingDirectory = workingDirectoryIn;
 
   const sourceFiles: SourceFile[] = [];
   const testFiles: TestFile[] = [];
@@ -110,11 +112,12 @@ export const findSourceAndTestFiles = async (): Promise<
 export const findSourceAndTestFilesFromGlobLists = async (
   sourceFileGlobs: string[],
   testFileGlobs: string[],
+  workingDirectoryIn: string,
 ): Promise<{
   sourceFiles: SourceFile[];
   testFiles: TestFile[];
 }> => {
-  const currentWorkingDirectory = Deno.cwd();
+  const currentWorkingDirectory = workingDirectoryIn;
 
   const sourceFiles: SourceFile[] = [];
   const testFiles: TestFile[] = [];
