@@ -85,22 +85,32 @@ export interface MutasaurusConfigInput {
   workers?: number;
   timeout?: number;
   exhaustiveMode?: boolean;
+  silent?: boolean;
 }
 
 /**
  * The results of the mutation testing process.
  *
- * This is both passed to the {@linkcode Reporter} and returned from the
- * {@linkcode Mutasaurus.run} method.
+ * This is passed to the {@linkcode Reporter}.
  */
-export interface MutasaurusResults {
+export type MutasaurusResults = {
   totalMutations: number;
   killedMutations: number;
   survivedMutations: number;
   erroneousMutations: number;
   timedOutMutations: number;
   mutations: MutationRun[];
-}
+};
+
+/**
+ * The results of the mutation testing process.
+ *
+ * returned from the {@linkcode Mutasaurus.run} method.
+ */
+export type MutasaurusResultsReturn = MutasaurusResults & {
+  /** The total time taken to run the mutation testing process. */
+  totalTime: number;
+};
 
 /**
  * The core responsibility of this class is to orchestrate the mutation testing process.
@@ -138,23 +148,25 @@ export class Mutasaurus {
     this.testRunner = new TestRunner(this.config.workers, this.config.timeout);
   }
 
-  async run(generateReport: boolean = true): Promise<MutasaurusResults> {
+  async run(generateReport: boolean = true, reportOutputPath?: string): Promise<MutasaurusResultsReturn> {
     const startTime = performance.now();
 
     const sourceFilesProvided = this.config.sourceFiles.length !== 0;
 
-    // Print opening statement.
-    console.log("\n---------------------------------\n");
-    console.log("Running Mutasaurus, with the following config...");
-    console.log(this.config);
-
-    if (!sourceFilesProvided) {
+    if (generateReport) {
+      // Print opening statement.
       console.log("\n---------------------------------\n");
-      console.log(
-        "Source files not provided, will search for source and test files in the current working directory",
-      );
+      console.log("Running Mutasaurus, with the following config...");
+      console.log(this.config);
+
+      if (!sourceFilesProvided) {
+        console.log("\n---------------------------------\n");
+        console.log(
+          "Source files not provided, will search for source and test files in the current working directory",
+        );
+      }
+      console.log("\n---------------------------------\n\n");
     }
-    console.log("\n---------------------------------\n\n");
 
     // Set source and test files.
     const { sourceFiles, testFiles } = sourceFilesProvided
@@ -182,7 +194,7 @@ export class Mutasaurus {
     const timedOutMutations =
       result.filter((result) => result.mutation.status === "timed-out")
         .length;
-    const outcome: MutasaurusResults = {
+    const outcome: Omit<MutasaurusResults, "totalTime"> = {
       totalMutations: mutations.length,
       killedMutations,
       survivedMutations,
@@ -191,7 +203,7 @@ export class Mutasaurus {
       mutations: result.map((result) => result.mutation),
     };
     if (generateReport) {
-      await this.reporter.generateReport(outcome);
+      await this.reporter.generateReport(outcome, reportOutputPath);
     }
 
     try {
@@ -204,9 +216,14 @@ export class Mutasaurus {
     }
 
     const programEndTime = performance.now();
-    console.log(`Program took ${programEndTime - startTime}ms to run`);
+    if (generateReport) {
+      console.log(`Program took ${programEndTime - startTime}ms to run`);
+    }
 
-    return outcome;
+    return {
+      ...outcome,
+      totalTime: programEndTime - startTime,
+    };
   }
 
   private async generateMutations(): Promise<MutationRun[]> {

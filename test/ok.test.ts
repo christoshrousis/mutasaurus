@@ -4,7 +4,7 @@ import { Mutasaurus } from '../mod.ts';
 
 Deno.test("given an un-configured run", async () => {
   const mutasaurus = new Mutasaurus();
-  const outcome = await mutasaurus.run();
+  const outcome = await mutasaurus.run(false);
 
   assertEquals(outcome.totalMutations, 9, "Total mutations should be 9");
   assertEquals(outcome.killedMutations, 7, "Killed mutations should be 7");
@@ -20,7 +20,7 @@ Deno.test("given a non-exhaustive, configured run", async () => {
     timeout: 1_000,
   });
   
-  const outcome = await mutasaurus.run();
+  const outcome = await mutasaurus.run(false);
 
   Deno.test("should run the mutation testing process, and return the expected outcome", () => {
     assertEquals(outcome.totalMutations, 32, "Total mutations should be 32");
@@ -46,7 +46,7 @@ Deno.test("given an exhaustive, configured run", async () => {
     exhaustiveMode: true,
   });
   
-  const outcome = await mutasaurus.run();
+  const outcome = await mutasaurus.run(false);
 
   Deno.test("should run the mutation testing process, and return the expected outcome", () => {
     assertEquals(outcome.totalMutations, 91, "Total mutations should be 91");
