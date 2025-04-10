@@ -1,6 +1,6 @@
 {
   "name": "@mutasaurus/mutasaurus",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "exports": "./mod.ts",
   "tasks": {
     "clean": "rm -rf ./.mutasaurus %% rm -rf ./coverage",

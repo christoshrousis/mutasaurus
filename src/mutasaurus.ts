@@ -146,6 +146,11 @@ export class Mutasaurus {
       ...config,
     };
 
+    // Ensure workingDirectory doesn't end with a forward slash
+    if (this.config.workingDirectory.endsWith("/")) {
+      this.config.workingDirectory = this.config.workingDirectory.slice(0, -1);
+    }
+
     this.mutator = new Mutator(this.config.exhaustiveMode);
     this.reporter = new Reporter();
     this.testRunner = new TestRunner(this.config.workers, this.config.timeout);
@@ -215,7 +220,9 @@ export class Mutasaurus {
     }
 
     try {
-      await Deno.remove("./.mutasaurus", { recursive: true });
+      await Deno.remove(`${this.config.workingDirectory}/.mutasaurus`, {
+        recursive: true,
+      });
     } catch (cleanupError) {
       console.error(
         "Failed to cleanup temporary test directory:",

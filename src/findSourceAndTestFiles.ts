@@ -52,9 +52,12 @@ export const findSourceAndTestFiles = async (
    */
 
   for await (
-    const file of expandGlob(ALL_TYPESCRIPT_FILES_GLOB, {
-      exclude: HIDDEN_DIRECTORIES_GLOB,
-    })
+    const file of expandGlob(
+      `${currentWorkingDirectory}/${ALL_TYPESCRIPT_FILES_GLOB}`,
+      {
+        exclude: HIDDEN_DIRECTORIES_GLOB,
+      },
+    )
   ) {
     const readFile = await Deno.readTextFile(file.path);
 
@@ -90,7 +93,7 @@ export const findSourceAndTestFiles = async (
    */
 
   for await (
-    const file of expandGlob(ALL_TYPESCRIPT_FILES_GLOB, {
+    const file of expandGlob(`${currentWorkingDirectory}/${ALL_TYPESCRIPT_FILES_GLOB}`, {
       exclude: HIDDEN_DIRECTORIES_GLOB,
     })
   ) {
