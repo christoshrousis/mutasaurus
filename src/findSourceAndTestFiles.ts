@@ -55,7 +55,7 @@ export const findSourceAndTestFiles = async (
     const file of expandGlob(
       `${currentWorkingDirectory}/${ALL_TYPESCRIPT_FILES_GLOB}`,
       {
-        exclude: HIDDEN_DIRECTORIES_GLOB,
+        exclude: [`${currentWorkingDirectory}/${HIDDEN_DIRECTORIES_GLOB}`],
       },
     )
   ) {
@@ -93,9 +93,12 @@ export const findSourceAndTestFiles = async (
    */
 
   for await (
-    const file of expandGlob(`${currentWorkingDirectory}/${ALL_TYPESCRIPT_FILES_GLOB}`, {
-      exclude: HIDDEN_DIRECTORIES_GLOB,
-    })
+    const file of expandGlob(
+      `${currentWorkingDirectory}/${ALL_TYPESCRIPT_FILES_GLOB}`,
+      {
+        exclude: [`${currentWorkingDirectory}/${HIDDEN_DIRECTORIES_GLOB}`],
+      },
+    )
   ) {
     if (!testFiles.some((testFile) => testFile.path === file.path)) {
       sourceFiles.push({
