@@ -21,11 +21,10 @@ type File = {
 type SourceFile = File;
 type TestFile = File;
 
-const ensureDirectoryExists = (filePath: string): void => {
-  const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
-  if (dirPath) {
-    Deno.mkdirSync(dirPath, { recursive: true });
-  }
+export type TestFileToSourceFileMapError = {
+  testFile: TestFile;
+  coveragePath: string;
+  error: string;
 };
 
 /**
@@ -150,12 +149,19 @@ export class TestRunner {
     testFiles: TestFile[];
     workingDirectoryIn: string;
   }): Promise<
-    Map<SourceFile["relativePath"], Array<TestFile["relativePath"]>>
+    {
+      sourceFileToTestFileCoverage: Map<
+        SourceFile["relativePath"],
+        Array<TestFile["relativePath"]>
+      >;
+      errors: TestFileToSourceFileMapError[];
+    }
   > {
     const sourceFileToTestFileCoverage = new Map<
       SourceFile["relativePath"],
       Array<TestFile["relativePath"]>
     >();
+    const errors: TestFileToSourceFileMapError[] = [];
     const currentWorkingDirectory = workingDirectoryIn;
 
     // Create a working directory for the test file, with the test file name for traceability.
@@ -187,8 +193,12 @@ export class TestRunner {
 
       const { success, stderr } = await process.output();
       if (!success) {
-        const decodedError = new TextDecoder().decode(stderr);
-        console.error(decodedError);
+        const error = new TextDecoder().decode(stderr);
+        errors.push({
+          testFile,
+          coveragePath,
+          error,
+        });
       }
 
       // read each json file in the coverage path, and parse it as json
@@ -213,7 +223,7 @@ export class TestRunner {
       }
     }
 
-    return sourceFileToTestFileCoverage;
+    return { sourceFileToTestFileCoverage, errors };
   }
 
   private createWorker(): Worker {

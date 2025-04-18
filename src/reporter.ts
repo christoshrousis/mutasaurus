@@ -15,6 +15,7 @@ export class Reporter {
       timedOutMutations,
       erroneousMutations,
       mutations,
+      errors,
     } = results;
     const mutationScore = (killedMutations / totalMutations) * 100;
 
@@ -45,7 +46,27 @@ export class Reporter {
     output += `Survived Mutations: ${survivedMutations}\n`;
     output += `Timed-out Mutations: ${timedOutMutations}\n`;
     output += `Erroneous Mutations: ${erroneousMutations}\n`;
-    output += `Mutation Score: ${mutationScore.toFixed(2)}%\n\n`;
+    if (!isNaN(mutationScore)) {
+      output += `Mutation Score: ${mutationScore.toFixed(2)}%\n\n`;
+    }
+
+    if (errors.length > 0) {
+      output += "\nErrors mapping test files\n";
+      output += "----------------------\n";
+      output +=
+        "Mutasaurus is still new, and we've had some internal errors.\n";
+      output +=
+        "Your mutation score is likely reporting less than it should be.\n";
+      output +=
+        "Below is a list of files that have run into an error, this is probably Mutasaurus's fault, not yours.\n";
+      output += "----------------------\n\n";
+      errors
+        .forEach((e) => {
+          output += `${e.testFile.relativePath}\n`;
+          output += `${e.error}`;
+          output += "----------------------\n";
+        });
+    }
 
     return output;
   }

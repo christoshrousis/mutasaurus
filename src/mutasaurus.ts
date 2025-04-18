@@ -1,6 +1,6 @@
 import { Mutator } from "./mutator.ts";
 import { Reporter } from "./reporter.ts";
-import { TestRunner } from "./testRunner.ts";
+import { TestFileToSourceFileMapError, TestRunner } from "./testRunner.ts";
 import {
   findSourceAndTestFiles,
   findSourceAndTestFilesFromGlobLists,
@@ -102,6 +102,7 @@ export type MutasaurusResults = {
   erroneousMutations: number;
   timedOutMutations: number;
   mutations: MutationRun[];
+  errors: TestFileToSourceFileMapError[];
 };
 
 /**
@@ -190,7 +191,7 @@ export class Mutasaurus {
     this.sourceFiles = sourceFiles;
     this.testFiles = testFiles;
 
-    const mutations = await this.generateMutations();
+    const { mutations, errors } = await this.generateMutations();
     const result = await this.testRunner.runTests(
       mutations,
       this.sourceFiles,
@@ -214,6 +215,7 @@ export class Mutasaurus {
       erroneousMutations,
       timedOutMutations,
       mutations: result.map((result) => result.mutation),
+      errors,
     };
     if (generateReport) {
       await this.reporter.generateReport(outcome, reportOutputPath);
@@ -241,8 +243,11 @@ export class Mutasaurus {
     };
   }
 
-  private async generateMutations(): Promise<MutationRun[]> {
-    const sourceFileToTestFileCoverage = await this.testRunner
+  private async generateMutations(): Promise<{
+    mutations: MutationRun[];
+    errors: TestFileToSourceFileMapError[];
+  }> {
+    const { sourceFileToTestFileCoverage, errors } = await this.testRunner
       .initialTestRunsWithCoverage({
         sourceFiles: this.sourceFiles,
         testFiles: this.testFiles,
@@ -281,6 +286,6 @@ export class Mutasaurus {
         });
       }
     }
-    return mutations;
+    return { mutations, errors };
   }
 }
