@@ -160,45 +160,26 @@ export class TestRunner {
 
     // Create a working directory for the test file, with the test file name for traceability.
     const workingDirectory =
-      `${currentWorkingDirectory}/.mutasaurus/initialTestRun-${
+      `${currentWorkingDirectory}/.mutasaurus/initialTestRunCoverage-${
         Math.random().toString(36).substring(7)
       }`;
     Deno.mkdirSync(workingDirectory, { recursive: true });
-
-    /**
-     * Copy all test files into the working directory
-     */
-    for (const testFile of testFiles) {
-      const testFilePath = `${workingDirectory}/${testFile.relativePath}`;
-      ensureDirectoryExists(testFilePath);
-      Deno.writeTextFileSync(testFilePath, testFile.content);
-    }
-
-    /**
-     * Copy all source files into the working directory
-     */
-    for (const sourceFile of sourceFiles) {
-      const sourceFilePath = `${workingDirectory}/${sourceFile.relativePath}`;
-      ensureDirectoryExists(sourceFilePath);
-      Deno.writeTextFileSync(sourceFilePath, sourceFile.content);
-    }
 
     /**
      * Run test suite with coverage, on a per test file basis to get coverage
      * of each individual source file.
      */
     for (const testFile of testFiles) {
-      const testFilePath = `${workingDirectory}/${testFile.relativePath}`;
-      const coveragePath =
-        `${workingDirectory}/coverage${testFile.relativePath}/`;
+      const coveragePath = `${workingDirectory}/${testFile.relativePath}/`;
       const process = new Deno.Command("deno", {
         args: [
           "test",
           "--allow-read",
           "--allow-write",
           "--allow-run",
+          "--allow-ffi",
           `--coverage=${coveragePath}`,
-          testFilePath,
+          testFile.path,
         ],
         stdout: "piped",
         stderr: "piped",
@@ -216,20 +197,16 @@ export class TestRunner {
         const coverageFile = await Deno.readTextFile(file.path);
         const coverage = JSON.parse(coverageFile);
         const coverageFilePath = coverage.url.replace("file://", "");
-        const coverageRelativePath = coverageFilePath.replace(
-          workingDirectory,
-          "",
-        );
 
         const isASourceFile = sourceFiles.some((sourceFile) =>
-          sourceFile.relativePath === coverageRelativePath
+          sourceFile.path === coverageFilePath
         );
         if (isASourceFile) {
           const currentCoverage =
-            sourceFileToTestFileCoverage.get(coverageRelativePath) ?? [];
-          currentCoverage.push(testFile.relativePath);
+            sourceFileToTestFileCoverage.get(coverageFilePath) ?? [];
+          currentCoverage.push(testFile.path);
           sourceFileToTestFileCoverage.set(
-            coverageRelativePath,
+            coverageFilePath,
             currentCoverage,
           );
         }

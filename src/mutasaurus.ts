@@ -34,7 +34,7 @@ export type MutationStatus =
 
 export type MutationRun = {
   original: {
-    relativePath: string;
+    path: string;
     content: string;
   };
   testFilesToRun: string[];
@@ -254,12 +254,13 @@ export class Mutasaurus {
     for (const sourceFile of sourceFileToTestFileCoverage.keys()) {
       const testFilesToRun = sourceFileToTestFileCoverage.get(sourceFile) ?? [];
       const content = await Deno.readTextFile(
-        `${this.config.workingDirectory}${sourceFile}`,
+        sourceFile,
       );
       const fileMutations = this.mutator.generateMutationsList(
         content,
         sourceFile,
       );
+
       for (const mutation of fileMutations) {
         // TODO: This operation probably resides elsewhere.
         let modifiedContent = content;
@@ -268,7 +269,7 @@ export class Mutasaurus {
           modifiedContent.slice(mutation.location.end);
         mutations.push({
           original: {
-            relativePath: sourceFile,
+            path: sourceFile,
             content,
           },
           testFilesToRun,

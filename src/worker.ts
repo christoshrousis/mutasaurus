@@ -54,15 +54,16 @@ self.onmessage = async (
   }
 
   // Copy the mutation into the working directory
-  const mutationTargetPath =
-    `${workingDirectory}/${mutation.original.relativePath}`;
+  const relativePath = mutation.original.path.replace(workingDirectoryIn, "");
+  const mutationTargetPath = `${workingDirectory}/${relativePath}`;
   ensureDirectoryExists(mutationTargetPath);
   Deno.writeTextFileSync(mutationTargetPath, mutation.mutation);
 
   // Prepare test files to run list
-  const testFilesToRun = mutation.testFilesToRun.map((testFile) =>
-    `${workingDirectory}/${testFile}`
-  );
+  const testFilesToRun = mutation.testFilesToRun.map((testFile) => {
+    const relativePath = testFile.replace(workingDirectoryIn, "");
+    return `${workingDirectory}/${relativePath}`;
+  });
 
   try {
     const process = new Deno.Command("deno", {
