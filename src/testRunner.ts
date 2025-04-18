@@ -160,7 +160,7 @@ export class TestRunner {
 
     // Create a working directory for the test file, with the test file name for traceability.
     const workingDirectory =
-      `${currentWorkingDirectory}/.mutasaurus/initialTestRunWithCoverage-${
+      `${currentWorkingDirectory}/.mutasaurus/initialTestRun-${
         Math.random().toString(36).substring(7)
       }`;
     Deno.mkdirSync(workingDirectory, { recursive: true });
@@ -204,7 +204,12 @@ export class TestRunner {
         stderr: "piped",
       });
 
-      await process.output();
+      const { success, stderr } = await process.output();
+      if (!success) {
+        const decodedError = new TextDecoder().decode(stderr);
+        console.error(decodedError);
+      }
+
       // read each json file in the coverage path, and parse it as json
       const coverageFiles = await expandGlob(`${coveragePath}/**/*.json`);
       for await (const file of coverageFiles) {
