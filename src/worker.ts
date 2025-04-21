@@ -21,6 +21,8 @@ const ensureDirectoryExists = (filePath: string): void => {
   }
 };
 
+declare const self: Worker;
+
 self.onmessage = async (
   e: {
     data: {
@@ -32,7 +34,6 @@ self.onmessage = async (
   },
 ) => {
   const startTime = performance.now();
-
   const { mutation, sourceFiles, testFiles, workingDirectoryIn } = e.data;
 
   // Create a temporary working directory for the mutation using absolute path
@@ -76,6 +77,7 @@ self.onmessage = async (
       ],
       stdout: "piped",
       stderr: "piped",
+      cwd: workingDirectory,
     });
 
     const { code, stderr } = await process.output();

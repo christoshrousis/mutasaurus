@@ -189,6 +189,7 @@ export class TestRunner {
         ],
         stdout: "piped",
         stderr: "piped",
+        cwd: workingDirectory,
       });
 
       const { success, stderr } = await process.output();
@@ -227,7 +228,7 @@ export class TestRunner {
   }
 
   private createWorker(): Worker {
-    const worker = new Worker(new URL("./worker.ts", import.meta.url), {
+    const worker = new Worker(new URL("./worker.ts", import.meta.url).href, {
       type: "module",
     });
     return worker;
