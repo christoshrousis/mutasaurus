@@ -23,8 +23,20 @@ export class Reporter {
     output += "=====================\n";
 
     if (survivedMutations > 0) {
+      const timestamp = new Date().toISOString();
+      const timestampFilenameFriendly = timestamp.replace(/[:.]/g, "_");
+
+      const survivedMutationsFilePath =
+        `${Deno.cwd()}/mutasaurus/survived-mutations_${timestampFilenameFriendly}.txt`;
       output += "\nSurvived Mutations:\n";
       output += "------------------\n";
+      output += `Survived Mutation count: ${survivedMutations}\n`;
+      output +=
+        `Files and locations of survived mutations recorded to::\n ${survivedMutationsFilePath}\n\n`;
+
+      let survivedMutationOutput = "";
+      survivedMutationOutput += `[${timestamp}] \nSurvived Mutations:\n`;
+      survivedMutationOutput += "------------------\n";
       mutations
         .filter((r) => r.status === "survived")
         .forEach((r) => {
@@ -32,11 +44,17 @@ export class Reporter {
             r.original.content,
             r.start,
           );
-          output += `File: ${r.original.path}:${line}:${column}\n`;
-          output += `Operator: ${r.operator}\n`;
-
-          output += "\n";
+          survivedMutationOutput +=
+            `File: ${r.original.path}:${line}:${column}\n`;
+          survivedMutationOutput += `Operator: ${r.operator}\n\n`;
         });
+
+      Deno.mkdirSync(`${Deno.cwd()}/mutasaurus`, { recursive: true });
+      Deno.writeTextFileSync(
+        survivedMutationsFilePath,
+        survivedMutationOutput + "\n\n",
+        { append: true },
+      );
     }
 
     output += "\nResults\n";
