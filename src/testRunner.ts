@@ -11,6 +11,7 @@
 
 import { expandGlob } from "@std/fs";
 import { MutationRun } from "../mod.ts";
+import { MemoryAwareWorkerPool, MemoryMonitor } from "./memoryMonitor.ts";
 
 type File = {
   path: string;
@@ -48,10 +49,12 @@ export class TestRunner {
   // Configuration helpers.
   private workers: number;
   private timeout: number;
+  private debug: boolean;
 
-  constructor(workers: number, timeout: number) {
+  constructor(workers: number, timeout: number, debug: boolean) {
     this.workers = workers;
     this.timeout = timeout;
+    this.debug = debug;
   }
 
   async runTests(
@@ -61,83 +64,140 @@ export class TestRunner {
     workingDirectoryIn: string,
   ): Promise<TestResult[]> {
     const results: TestResult[] = [];
-    const workerPool = Array.from(
-      { length: this.workers },
-      () => this.createWorker(),
-    );
-    const activeWorkers = new Set<Worker>();
 
-    // Process test files in parallel using the worker pool
-    const testPromises = mutations.map(async (mutation) => {
-      // Wait for an available worker
-      let worker: Worker | undefined;
-      while (!worker) {
-        for (const w of workerPool) {
-          if (!activeWorkers.has(w)) {
-            worker = w;
-            break;
-          }
-        }
-        if (!worker) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-      }
-
-      activeWorkers.add(worker);
-      try {
-        const result = await new Promise<TestResult>((resolve) => {
-          const timeoutId = setTimeout(() => {
-            const timedOutResult: TestResult = {
-              mutation: {
-                ...mutation,
-                status: "timed-out",
-                duration: this.timeout,
-              },
-              outcome: "timed-out",
-              duration: this.timeout,
-            };
-            resolve(timedOutResult);
-          }, this.timeout);
-
-          worker!.onmessage = (e: { data: TestResult }) => {
-            clearTimeout(timeoutId);
-            resolve(e.data);
-          };
-
-          worker!.onerror = (error) => {
-            clearTimeout(timeoutId);
-            const errorResult: TestResult = {
-              mutation: {
-                ...mutation,
-                status: "error",
-                duration: 0,
-              },
-              outcome: "error",
-              error: error instanceof Error ? error.message : String(error),
-              duration: 0,
-            };
-            resolve(errorResult);
-          };
-
-          worker!.postMessage({
-            mutation,
-            sourceFiles,
-            testFiles,
-            workingDirectoryIn,
-          });
-        });
-        results.push(result);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        activeWorkers.delete(worker);
-      }
+    const monitor = new MemoryMonitor({
+      warningThresholdMB: 500,
+      criticalThresholdMB: 800,
+      emergencyThresholdMB: 1200,
+      logToFile: this.debug,
+      logToConsole: this.debug,
+      logFilePath: "./memory-monitor.log",
+      onWarning: (usage) => {
+        console.warn(
+          `Memory warning: ${usage.rssMB}MB used. Slowing down task processing.`,
+        );
+      },
+      onCritical: (usage) => {
+        console.error(
+          `Memory critical: ${usage.rssMB}MB used. Stopping new tasks.`,
+        );
+      },
+      onEmergency: (usage) => {
+        console.error(
+          `Memory emergency: ${usage.rssMB}MB used. Taking emergency actions.`,
+        );
+        monitor.forceGarbageCollection();
+      },
     });
 
-    await Promise.all(testPromises);
-    // Clean up all workers
-    workerPool.forEach((worker) => worker.terminate());
-    return results;
+    const workerPool = new MemoryAwareWorkerPool(monitor, this.workers);
+
+    const runWorkerTask = (
+      { mutation, sourceFiles, testFiles, workingDirectory }: {
+        mutation: MutationRun;
+        sourceFiles: SourceFile[];
+        testFiles: TestFile[];
+        workingDirectory: string;
+      },
+    ): Promise<TestResult> => {
+      return new Promise<TestResult>((resolve) => {
+        const worker = new Worker(
+          new URL("./worker.ts", import.meta.url).href,
+          {
+            type: "module",
+          },
+        );
+
+        const timeoutId = setTimeout(() => {
+          const timedOutResult: TestResult = {
+            mutation: {
+              ...mutation,
+              status: "timed-out",
+              duration: this.timeout,
+            },
+            outcome: "timed-out",
+            duration: this.timeout,
+          };
+          worker.terminate();
+          resolve(timedOutResult);
+        }, this.timeout);
+
+        worker.onmessage = (e: { data: TestResult }) => {
+          clearTimeout(timeoutId);
+          worker.terminate();
+          resolve(e.data);
+        };
+
+        worker.onerror = (error) => {
+          clearTimeout(timeoutId);
+          worker.terminate();
+          const errorResult: TestResult = {
+            mutation: {
+              ...mutation,
+              status: "error",
+              duration: 0,
+            },
+            outcome: "error",
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          };
+          resolve(errorResult);
+        };
+
+        worker.postMessage({
+          mutation,
+          sourceFiles,
+          testFiles,
+          workingDirectoryIn: workingDirectory,
+        });
+      });
+    };
+
+    // Create an array of promises for all tasks
+    const taskPromises = mutations.map((mutation) => {
+      return new Promise<TestResult>((resolve) => {
+        workerPool.addTask(async () => {
+          const result = await runWorkerTask(
+            {
+              mutation,
+              sourceFiles,
+              testFiles,
+              workingDirectory: workingDirectoryIn,
+            },
+          );
+          results.push(result);
+          resolve(result);
+        });
+      });
+    });
+
+    // Start status monitoring
+    const statusInterval = setInterval(async () => {
+      const status = workerPool.getStatus();
+      const replaceLine = this.debug ? "" : "\r";
+      const percentageComplete = 100 -
+        ((status.queuedTasks / taskPromises.length) *
+          100);
+      const encoder = new TextEncoder();
+      await Deno.stdout.write(
+        encoder.encode(
+          `${replaceLine}Status: Active=${status.activeWorkers}, Queued=${status.queuedTasks}, Total=${taskPromises.length} Memory=${
+            status.memoryUsage?.rssMB || 0
+          }MB, ${percentageComplete.toFixed(2)}% complete`,
+        ),
+      );
+    }, 1000);
+
+    try {
+      // Wait for all tasks to complete
+      await Promise.all(taskPromises);
+      return results;
+    } finally {
+      // Clean up
+      clearInterval(statusInterval);
+      monitor.stop();
+      console.log("\nAll tasks completed");
+    }
   }
 
   public async initialTestRunsWithCoverage({
@@ -225,12 +285,5 @@ export class TestRunner {
     }
 
     return { sourceFileToTestFileCoverage, errors };
-  }
-
-  private createWorker(): Worker {
-    const worker = new Worker(new URL("./worker.ts", import.meta.url).href, {
-      type: "module",
-    });
-    return worker;
   }
 }

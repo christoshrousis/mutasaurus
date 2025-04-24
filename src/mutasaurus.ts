@@ -69,6 +69,8 @@ export interface MutasaurusConfig {
   exhaustiveMode: boolean;
   /** When the root directory where mutasaurus is run from, is not the root of the project you want to test, you can provide the path to the project root here. */
   workingDirectory: string;
+  /** Whether to run in debug mode. */
+  debug: boolean;
 }
 
 /**
@@ -88,6 +90,7 @@ export interface MutasaurusConfigInput {
   timeout?: number;
   exhaustiveMode?: boolean;
   workingDirectory?: string;
+  debug?: boolean;
 }
 
 /**
@@ -129,10 +132,11 @@ export class Mutasaurus {
     sourceFiles: [],
     testFiles: [],
     operators: ["arithmetic", "logical", "control"],
-    workers: 4,
+    workers: 8,
     timeout: 5000,
     exhaustiveMode: false,
     workingDirectory: Deno.cwd(),
+    debug: false,
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -147,14 +151,17 @@ export class Mutasaurus {
       ...config,
     };
 
-    // Ensure workingDirectory doesn't end with a forward slash
     if (this.config.workingDirectory.endsWith("/")) {
       this.config.workingDirectory = this.config.workingDirectory.slice(0, -1);
     }
 
     this.mutator = new Mutator(this.config.exhaustiveMode);
     this.reporter = new Reporter();
-    this.testRunner = new TestRunner(this.config.workers, this.config.timeout);
+    this.testRunner = new TestRunner(
+      this.config.workers,
+      this.config.timeout,
+      this.config.debug,
+    );
   }
 
   async run(
