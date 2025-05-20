@@ -50,11 +50,18 @@ export class TestRunner {
   private workers: number;
   private timeout: number;
   private debug: boolean;
+  private noCheck: boolean;
 
-  constructor(workers: number, timeout: number, debug: boolean) {
+  constructor(
+    workers: number,
+    timeout: number,
+    debug: boolean,
+    noCheck: boolean,
+  ) {
     this.workers = workers;
     this.timeout = timeout;
     this.debug = debug;
+    this.noCheck = noCheck;
   }
 
   async runTests(
@@ -149,6 +156,7 @@ export class TestRunner {
           sourceFiles,
           testFiles,
           workingDirectoryIn: workingDirectory,
+          noCheck: this.noCheck,
         });
       });
     };
@@ -244,6 +252,8 @@ export class TestRunner {
           "--allow-write",
           "--allow-run",
           "--allow-ffi",
+          "--allow-import",
+          ...(this.noCheck ? ["--no-check"] : []),
           `--coverage=${coveragePath}`,
           testFile.path,
         ],

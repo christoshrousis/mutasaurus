@@ -71,6 +71,8 @@ export interface MutasaurusConfig {
   workingDirectory: string;
   /** Whether to run in debug mode. */
   debug: boolean;
+  /** Whether to skip type checking when running tests. Defaults to false. */
+  noCheck: boolean;
 }
 
 /**
@@ -91,6 +93,7 @@ export interface MutasaurusConfigInput {
   exhaustiveMode?: boolean;
   workingDirectory?: string;
   debug?: boolean;
+  noCheck?: boolean;
 }
 
 /**
@@ -137,6 +140,7 @@ export class Mutasaurus {
     exhaustiveMode: false,
     workingDirectory: Deno.cwd(),
     debug: false,
+    noCheck: false,
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -161,6 +165,7 @@ export class Mutasaurus {
       this.config.workers,
       this.config.timeout,
       this.config.debug,
+      this.config.noCheck,
     );
   }
 

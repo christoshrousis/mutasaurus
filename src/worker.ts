@@ -30,11 +30,13 @@ self.onmessage = async (
       sourceFiles: SourceFile[];
       testFiles: TestFile[];
       workingDirectoryIn: string;
+      noCheck: boolean;
     };
   },
 ) => {
   const startTime = performance.now();
-  const { mutation, sourceFiles, testFiles, workingDirectoryIn } = e.data;
+  const { mutation, sourceFiles, testFiles, workingDirectoryIn, noCheck } =
+    e.data;
 
   // Create a temporary working directory for the mutation using absolute path
   const workingDirectory = `${workingDirectoryIn}/.mutasaurus/${
@@ -73,6 +75,9 @@ self.onmessage = async (
         "--allow-read",
         "--allow-write",
         "--allow-run",
+        "--allow-ffi",
+        "--allow-import",
+        ...(noCheck ? ["--no-check"] : []),
         ...testFilesToRun,
       ],
       stdout: "piped",
