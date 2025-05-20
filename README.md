@@ -103,7 +103,7 @@ so it is suggested you don't set an arbitrarily large number here.
 
 ## Examples
 
-TODO [Real-world examples]
+See: [https://mutasaurus.com/showcase](https://mutasaurus.com/showcase) for a list of mutation runs against open source projects and their results.
 
 ## Development
 
@@ -131,9 +131,12 @@ Note: Currently there is only a single E2E test
 
 ## Road to V1
 
-- Parity mutation support with StrykerJS.
-- Use coverage reporting to run test suite subset to increase performance.
-- Implement cache system to avoid re-running whats not required.
+- [ ] Add CLI support.
+- [ ] Close to parity¹ mutation support with StrykerJS.²
+- [ ] Use coverage reporting to run test suite subset to increase performance.
+- [ ] Implement StykerJS style cache system to avoid re-running whats not required.
+- [ ] Add web based accounts & reporting.
+  
 
 ## Contributing
 
@@ -163,10 +166,13 @@ Moving Forward, the guiding principles are:
   - Comprehensive documentation with examples
   - Integration with Deno's testing ecosystem
 
+¹ StrykerJS supports quite a number of mutations by default - Mutasaurus will opt out of some of those mutations in favour of a smaller subset. This could become configurable or be combined with "exhaustive mode" for more stricter requirements.
+² [StrykerJS](https://github.com/stryker-mutator/stryker-js) is a mature mutation testing framework for Node based JavaScript/TypeScript projects.
+
 ## License
 
 MIT
 
 ## Special Thanks
 
-If you're working on a Node JS/TS project and want a mature/stable mutation testing library, please use [StykerJS](https://github.com/stryker-mutator/stryker-js) 😊
+I have used [StrykerJS](https://github.com/stryker-mutator/stryker-js) in projects historically with great success. There is no reason not to keep using StrykerJS today. 😊
