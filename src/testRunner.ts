@@ -248,11 +248,7 @@ export class TestRunner {
       const process = new Deno.Command("deno", {
         args: [
           "test",
-          "--allow-read",
-          "--allow-write",
-          "--allow-run",
-          "--allow-ffi",
-          "--allow-import",
+          "--allow-all",
           ...(this.noCheck ? ["--no-check"] : []),
           `--coverage=${coveragePath}`,
           testFile.path,
