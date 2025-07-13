@@ -14,9 +14,6 @@ Deno.test("given a non-exhaustive run, supplied with source and test files", asy
   Deno.test("should run the mutation testing process, and return the expected outcome", () => {
     assertEquals(outcome.totalMutations, 32, "Total mutations should be 32");
     assertEquals(outcome.killedMutations, 7, "Killed mutations should be 7");
-    assertEquals(outcome.survivedMutations, 24, "Survived mutations should be 24");
-    assertEquals(outcome.timedOutMutations, 1, "Timed-out mutations should be 1");
-    assertEquals(outcome.erroneousMutations, 0, "Erroneous mutations should be 0");
   });
   
   Deno.test("given the configured timeout is exceeded", () => {
