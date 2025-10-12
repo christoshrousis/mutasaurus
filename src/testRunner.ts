@@ -51,17 +51,21 @@ export class TestRunner {
   private timeout: number;
   private debug: boolean;
   private noCheck: boolean;
+  private timeoutMultiplier: number;
+  private dynamicTimeout: number | null = null;
 
   constructor(
     workers: number,
     timeout: number,
     debug: boolean,
     noCheck: boolean,
+    timeoutMultiplier: number = 3,
   ) {
     this.workers = workers;
     this.timeout = timeout;
     this.debug = debug;
     this.noCheck = noCheck;
+    this.timeoutMultiplier = timeoutMultiplier;
   }
 
   async runTests(
@@ -115,19 +119,22 @@ export class TestRunner {
           },
         );
 
+        // Use dynamic timeout if available, otherwise fall back to static timeout
+        const effectiveTimeout = this.dynamicTimeout ?? this.timeout;
+
         const timeoutId = setTimeout(() => {
           const timedOutResult: TestResult = {
             mutation: {
               ...mutation,
               status: "timed-out",
-              duration: this.timeout,
+              duration: effectiveTimeout,
             },
             outcome: "timed-out",
-            duration: this.timeout,
+            duration: effectiveTimeout,
           };
           worker.terminate();
           resolve(timedOutResult);
-        }, this.timeout);
+        }, effectiveTimeout);
 
         worker.onmessage = (e: { data: TestResult }) => {
           clearTimeout(timeoutId);
@@ -239,12 +246,17 @@ export class TestRunner {
       }`;
     Deno.mkdirSync(workingDirectory, { recursive: true });
 
+    // Track timing for dynamic timeout calculation
+    const testRunTimes: number[] = [];
+
     /**
      * Run test suite with coverage, on a per test file basis to get coverage
      * of each individual source file.
      */
     for (const testFile of testFiles) {
       const coveragePath = `${workingDirectory}/${testFile.relativePath}/`;
+      const testStartTime = performance.now();
+
       const process = new Deno.Command("deno", {
         args: [
           "test",
@@ -259,6 +271,8 @@ export class TestRunner {
       });
 
       const { success, stderr } = await process.output();
+      const testDuration = performance.now() - testStartTime;
+      testRunTimes.push(testDuration);
       if (!success) {
         const error = new TextDecoder().decode(stderr);
         errors.push({
@@ -287,6 +301,32 @@ export class TestRunner {
             currentCoverage,
           );
         }
+      }
+    }
+
+    // Calculate dynamic timeout based on baseline measurements
+    if (this.timeoutMultiplier > 0 && testRunTimes.length > 0) {
+      // Use the maximum test run time as baseline (slowest test file)
+      const maxTestTime = Math.max(...testRunTimes);
+
+      // Calculate dynamic timeout: slowest test * multiplier
+      // Use a minimum of the configured static timeout
+      this.dynamicTimeout = Math.max(
+        this.timeout,
+        Math.ceil(maxTestTime * this.timeoutMultiplier),
+      );
+
+      if (this.debug) {
+        console.log(`\nDynamic timeout calculation:`);
+        console.log(
+          `  - Test run times: ${
+            testRunTimes.map((t) => Math.round(t)).join(", ")
+          }ms`,
+        );
+        console.log(`  - Slowest test: ${Math.round(maxTestTime)}ms`);
+        console.log(`  - Timeout multiplier: ${this.timeoutMultiplier}x`);
+        console.log(`  - Calculated timeout: ${this.dynamicTimeout}ms`);
+        console.log(`  - Static timeout: ${this.timeout}ms`);
       }
     }
 

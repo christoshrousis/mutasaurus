@@ -59,6 +59,13 @@ export interface MutasaurusConfig {
   workers: number;
   /** The timeout for the individual workers in the worker pools. */
   timeout: number;
+  /** Multiplier applied to baseline test execution time to calculate dynamic timeout. Defaults to 3.
+   *
+   * When enabled, the actual timeout used will be: baseline_test_time * timeoutMultiplier
+   * This helps account for test suite execution overhead while still catching infinite loops.
+   * Set to 0 to disable dynamic timeout calculation and use the static timeout value instead.
+   */
+  timeoutMultiplier: number;
   /** Whether to execute as many possible permutations as possible. Defaults to false.
    *
    * Instead of the Mutsaurus curated subset of mutations, this will run all possible mutations.
@@ -90,6 +97,7 @@ export interface MutasaurusConfigInput {
   operators?: string[];
   workers?: number;
   timeout?: number;
+  timeoutMultiplier?: number;
   exhaustiveMode?: boolean;
   workingDirectory?: string;
   debug?: boolean;
@@ -136,7 +144,8 @@ export class Mutasaurus {
     testFiles: [],
     operators: ["arithmetic", "logical", "control"],
     workers: 8,
-    timeout: 5000,
+    timeout: 10000,
+    timeoutMultiplier: 3,
     exhaustiveMode: false,
     workingDirectory: Deno.cwd(),
     debug: false,
@@ -166,6 +175,7 @@ export class Mutasaurus {
       this.config.timeout,
       this.config.debug,
       this.config.noCheck,
+      this.config.timeoutMultiplier,
     );
   }
 
