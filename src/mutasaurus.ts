@@ -89,6 +89,13 @@ export interface MutasaurusConfig {
    * Recommended for large mutation test suites (100+ mutations).
    */
   usePersistentWorkers: boolean;
+  /** Whether to use in-memory mutations (apply mutations directly to source files). Defaults to false.
+   *
+   * When enabled, mutations are applied directly to source files without copying to temporary directories.
+   * This changes the architecture of the mutation testing process and may improve performance by eliminating file I/O overhead.
+   * IMPORTANT: Requires careful synchronization - only one mutation per source file at a time.
+   */
+  useInMemoryMutations: boolean;
 }
 
 /**
@@ -112,6 +119,7 @@ export interface MutasaurusConfigInput {
   debug?: boolean;
   noCheck?: boolean;
   usePersistentWorkers?: boolean;
+  useInMemoryMutations?: boolean;
 }
 
 /**
@@ -162,6 +170,7 @@ export class Mutasaurus {
     debug: false,
     noCheck: false,
     usePersistentWorkers: false,
+    useInMemoryMutations: false,
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -189,6 +198,7 @@ export class Mutasaurus {
       this.config.noCheck,
       this.config.timeoutMultiplier,
       this.config.usePersistentWorkers,
+      this.config.useInMemoryMutations,
     );
   }
 

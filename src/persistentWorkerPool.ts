@@ -340,7 +340,7 @@ export class PersistentWorkerPool {
   /**
    * Execute a task using the worker pool
    */
-  async executeTask(task: WorkerTask, timeout?: number): Promise<TestResult> {
+  executeTask(task: WorkerTask, timeout?: number): Promise<TestResult> {
     if (this.isShuttingDown) {
       throw new Error("Worker pool is shutting down");
     }
@@ -431,7 +431,7 @@ export class PersistentWorkerPool {
 
     try {
       workerInfo.worker.postMessage(message);
-    } catch (error) {
+    } catch (_error) {
       // Failed to send message, restart worker
       if (pendingTask.timeoutId) {
         clearTimeout(pendingTask.timeoutId);

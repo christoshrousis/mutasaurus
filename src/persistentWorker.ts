@@ -216,14 +216,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
     case "shutdown": {
       // Worker is being shut down, exit gracefully
-      self.close();
+      (self as any).close();
       break;
     }
 
     default: {
       const errorResponse: WorkerResponse = {
         type: "error",
-        error: `Unknown message type: ${(message as any).type}`,
+        error: `Unknown message type: ${(message as unknown as { type?: string | null })?.type}`,
       };
       self.postMessage(errorResponse);
     }

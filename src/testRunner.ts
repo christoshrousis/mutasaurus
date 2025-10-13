@@ -60,6 +60,7 @@ export class TestRunner {
   private timeoutMultiplier: number;
   private dynamicTimeout: number | null = null;
   private usePersistentWorkers: boolean;
+  private useInMemoryMutations: boolean;
 
   constructor(
     workers: number,
@@ -68,6 +69,7 @@ export class TestRunner {
     noCheck: boolean,
     timeoutMultiplier: number = 3,
     usePersistentWorkers: boolean = false,
+    useInMemoryMutations: boolean = false,
   ) {
     this.workers = workers;
     this.timeout = timeout;
@@ -75,6 +77,7 @@ export class TestRunner {
     this.noCheck = noCheck;
     this.timeoutMultiplier = timeoutMultiplier;
     this.usePersistentWorkers = usePersistentWorkers;
+    this.useInMemoryMutations = useInMemoryMutations;
   }
 
   runTests(
@@ -84,7 +87,13 @@ export class TestRunner {
     workingDirectoryIn: string,
   ): Promise<TestResult[]> {
     // Route to appropriate implementation based on configuration
-    if (this.usePersistentWorkers) {
+    if (this.useInMemoryMutations) {
+      return this.runTestsWithInMemoryMutations(
+        mutations,
+        testFiles,
+        workingDirectoryIn,
+      );
+    } else if (this.usePersistentWorkers) {
       return this.runTestsWithPersistentPool(
         mutations,
         sourceFiles,
@@ -441,5 +450,170 @@ export class TestRunner {
     }
 
     return { sourceFileToTestFileCoverage, errors };
+  }
+
+  /**
+   * Run tests using in-memory mutations (optimized architecture)
+   *
+   * Applies mutations directly to source files without copying to temp directories.
+   * IMPORTANT: Mutations on the same source file are serialized to prevent race conditions.
+   */
+  private async runTestsWithInMemoryMutations(
+    mutations: MutationRun[],
+    _testFiles: TestFile[],
+    workingDirectoryIn: string,
+  ): Promise<TestResult[]> {
+    const results: TestResult[] = [];
+    const effectiveTimeout = this.dynamicTimeout ?? this.timeout;
+
+    // Group mutations by source file to ensure sequential execution per file
+    const mutationsBySourceFile = new Map<string, MutationRun[]>();
+    for (const mutation of mutations) {
+      const sourceFilePath = mutation.original.path;
+      if (!mutationsBySourceFile.has(sourceFilePath)) {
+        mutationsBySourceFile.set(sourceFilePath, []);
+      }
+      mutationsBySourceFile.get(sourceFilePath)!.push(mutation);
+    }
+
+    if (this.debug) {
+      console.log(
+        `Running ${mutations.length} mutations with in-memory mode...`,
+      );
+      console.log(`Grouped into ${mutationsBySourceFile.size} source files`);
+    }
+
+    // Create a semaphore to limit concurrent source file mutations
+    const monitor = new MemoryMonitor({
+      warningThresholdMB: 500,
+      criticalThresholdMB: 800,
+      emergencyThresholdMB: 1200,
+      logToFile: this.debug,
+      logToConsole: this.debug,
+      logFilePath: "./memory-monitor.log",
+      onWarning: (usage) => {
+        console.warn(
+          `Memory warning: ${usage.rssMB}MB used. Slowing down task processing.`,
+        );
+      },
+      onCritical: (usage) => {
+        console.error(
+          `Memory critical: ${usage.rssMB}MB used. Stopping new tasks.`,
+        );
+      },
+      onEmergency: (usage) => {
+        console.error(
+          `Memory emergency: ${usage.rssMB}MB used. Taking emergency actions.`,
+        );
+        monitor.forceGarbageCollection();
+      },
+    });
+
+    const workerPool = new MemoryAwareWorkerPool(monitor, this.workers);
+
+    const runInMemoryMutation = (
+      mutation: MutationRun,
+    ): Promise<TestResult> => {
+      return new Promise<TestResult>((resolve) => {
+        const worker = new Worker(
+          new URL("./inMemoryWorker.ts", import.meta.url).href,
+          {
+            type: "module",
+          },
+        );
+
+        const timeoutId = setTimeout(() => {
+          const timedOutResult: TestResult = {
+            mutation: {
+              ...mutation,
+              status: "timed-out",
+              duration: effectiveTimeout,
+            },
+            outcome: "timed-out",
+            duration: effectiveTimeout,
+          };
+          worker.terminate();
+          resolve(timedOutResult);
+        }, effectiveTimeout);
+
+        worker.onmessage = (e: { data: TestResult }) => {
+          clearTimeout(timeoutId);
+          worker.terminate();
+          resolve(e.data);
+        };
+
+        worker.onerror = (error) => {
+          clearTimeout(timeoutId);
+          worker.terminate();
+          const errorResult: TestResult = {
+            mutation: {
+              ...mutation,
+              status: "error",
+              duration: 0,
+            },
+            outcome: "error",
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          };
+          resolve(errorResult);
+        };
+
+        worker.postMessage({
+          mutation,
+          testFilePaths: mutation.testFilesToRun,
+          workingDirectory: workingDirectoryIn,
+          noCheck: this.noCheck,
+        });
+      });
+    };
+
+    // Process mutations grouped by source file, running each file's mutations sequentially
+    const sourceFilePromises = Array.from(mutationsBySourceFile.entries()).map(
+      ([_sourceFilePath, fileMutations]) => {
+        return new Promise<TestResult[]>(async (resolve) => {
+          const fileResults: TestResult[] = [];
+
+          // Run mutations for this source file sequentially (one at a time)
+          for (const mutation of fileMutations) {
+            await new Promise<void>((resolveMutation) => {
+              workerPool.addTask(async () => {
+                const result = await runInMemoryMutation(mutation);
+                fileResults.push(result);
+                results.push(result);
+                resolveMutation();
+              });
+            });
+          }
+
+          resolve(fileResults);
+        });
+      },
+    );
+
+    // Start status monitoring
+    const statusInterval = setInterval(async () => {
+      const status = workerPool.getStatus();
+      const replaceLine = this.debug ? "" : "\r";
+      const percentageComplete = (results.length / mutations.length) * 100;
+      const encoder = new TextEncoder();
+      await Deno.stdout.write(
+        encoder.encode(
+          `${replaceLine}Status: Active=${status.activeWorkers}, Queued=${status.queuedTasks}, Completed=${results.length}/${mutations.length}, Memory=${
+            status.memoryUsage?.rssMB || 0
+          }MB, ${percentageComplete.toFixed(2)}% complete`,
+        ),
+      );
+    }, 1000);
+
+    try {
+      // Wait for all source files to complete
+      await Promise.all(sourceFilePromises);
+      return results;
+    } finally {
+      // Clean up
+      clearInterval(statusInterval);
+      monitor.stop();
+      console.log("\nAll tasks completed");
+    }
   }
 }
