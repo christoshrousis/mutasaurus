@@ -82,6 +82,13 @@ export interface MutasaurusConfig {
   debug: boolean;
   /** Whether to skip type checking when running tests. Defaults to false. */
   noCheck: boolean;
+  /** Whether to use persistent worker pool (reuse workers across mutations). Defaults to false.
+   *
+   * When enabled, workers stay alive for the entire mutation testing session and are reused.
+   * This improves performance by eliminating worker spawn overhead.
+   * Recommended for large mutation test suites (100+ mutations).
+   */
+  usePersistentWorkers: boolean;
 }
 
 /**
@@ -104,6 +111,7 @@ export interface MutasaurusConfigInput {
   workingDirectory?: string;
   debug?: boolean;
   noCheck?: boolean;
+  usePersistentWorkers?: boolean;
 }
 
 /**
@@ -153,6 +161,7 @@ export class Mutasaurus {
     workingDirectory: Deno.cwd(),
     debug: false,
     noCheck: false,
+    usePersistentWorkers: false,
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -179,6 +188,7 @@ export class Mutasaurus {
       this.config.debug,
       this.config.noCheck,
       this.config.timeoutMultiplier,
+      this.config.usePersistentWorkers,
     );
   }
 

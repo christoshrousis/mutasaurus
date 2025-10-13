@@ -12,6 +12,7 @@
 import { expandGlob } from "@std/fs";
 import { MutationRun } from "../mod.ts";
 import { MemoryAwareWorkerPool, MemoryMonitor } from "./memoryMonitor.ts";
+import { PersistentWorkerPool, WorkerTask } from "./persistentWorkerPool.ts";
 
 type File = {
   path: string;
@@ -58,6 +59,7 @@ export class TestRunner {
   private noCheck: boolean;
   private timeoutMultiplier: number;
   private dynamicTimeout: number | null = null;
+  private usePersistentWorkers: boolean;
 
   constructor(
     workers: number,
@@ -65,15 +67,118 @@ export class TestRunner {
     debug: boolean,
     noCheck: boolean,
     timeoutMultiplier: number = 3,
+    usePersistentWorkers: boolean = false,
   ) {
     this.workers = workers;
     this.timeout = timeout;
     this.debug = debug;
     this.noCheck = noCheck;
     this.timeoutMultiplier = timeoutMultiplier;
+    this.usePersistentWorkers = usePersistentWorkers;
   }
 
-  async runTests(
+  runTests(
+    mutations: MutationRun[],
+    sourceFiles: SourceFile[],
+    testFiles: TestFile[],
+    workingDirectoryIn: string,
+  ): Promise<TestResult[]> {
+    // Route to appropriate implementation based on configuration
+    if (this.usePersistentWorkers) {
+      return this.runTestsWithPersistentPool(
+        mutations,
+        sourceFiles,
+        testFiles,
+        workingDirectoryIn,
+      );
+    } else {
+      return this.runTestsWithEphemeralWorkers(
+        mutations,
+        sourceFiles,
+        testFiles,
+        workingDirectoryIn,
+      );
+    }
+  }
+
+  /**
+   * Run tests using persistent worker pool (new architecture)
+   */
+  private async runTestsWithPersistentPool(
+    mutations: MutationRun[],
+    sourceFiles: SourceFile[],
+    testFiles: TestFile[],
+    workingDirectoryIn: string,
+  ): Promise<TestResult[]> {
+    const results: TestResult[] = [];
+    const effectiveTimeout = this.dynamicTimeout ?? this.timeout;
+
+    // Initialize persistent worker pool
+    const pool = new PersistentWorkerPool(
+      this.workers,
+      effectiveTimeout,
+      this.debug,
+    );
+
+    try {
+      await pool.initialize();
+
+      if (this.debug) {
+        console.log(
+          `Running ${mutations.length} mutations with persistent worker pool...`,
+        );
+      }
+
+      // Create tasks for all mutations
+      const taskPromises = mutations.map(async (mutation) => {
+        const task: WorkerTask = {
+          mutation,
+          sourceFiles,
+          testFiles,
+          workingDirectory: workingDirectoryIn,
+          noCheck: this.noCheck,
+        };
+
+        const result = await pool.executeTask(task, effectiveTimeout);
+        results.push(result);
+        return result;
+      });
+
+      // Start status monitoring
+      const statusInterval = setInterval(() => {
+        const status = pool.getStatus();
+        const replaceLine = this.debug ? "" : "\r";
+        const percentageComplete = (status.tasksCompleted / mutations.length) *
+          100;
+        const encoder = new TextEncoder();
+        Deno.stdout.write(
+          encoder.encode(
+            `${replaceLine}Status: Active=${status.activeWorkers}/${status.totalWorkers}, Queued=${status.queuedTasks}, Completed=${status.tasksCompleted}/${mutations.length}, ${
+              percentageComplete.toFixed(2)
+            }% complete`,
+          ),
+        );
+      }, 1000);
+
+      try {
+        // Wait for all tasks to complete
+        await Promise.all(taskPromises);
+        return results;
+      } finally {
+        // Clean up
+        clearInterval(statusInterval);
+        console.log("\nAll tasks completed");
+      }
+    } finally {
+      // Shutdown pool
+      await pool.shutdown();
+    }
+  }
+
+  /**
+   * Run tests using ephemeral workers (original architecture)
+   */
+  private async runTestsWithEphemeralWorkers(
     mutations: MutationRun[],
     sourceFiles: SourceFile[],
     testFiles: TestFile[],
