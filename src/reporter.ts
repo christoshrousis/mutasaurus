@@ -14,10 +14,12 @@ export class Reporter {
       survivedMutations,
       timedOutMutations,
       erroneousMutations,
+      typeErrorMutations,
       mutations,
       errors,
     } = results;
-    const mutationScore = (killedMutations / totalMutations) * 100;
+    const mutationScore =
+      ((killedMutations + typeErrorMutations) / totalMutations) * 100;
 
     let output = "\nMutation Testing Report\n";
     output += "=====================\n";
@@ -61,11 +63,15 @@ export class Reporter {
     output += "----------------------\n";
     output += `Total Mutations: ${totalMutations}\n`;
     output += `Killed Mutations: ${killedMutations}\n`;
+    output += `Type Error Mutations: ${typeErrorMutations}\n`;
     output += `Survived Mutations: ${survivedMutations}\n`;
     output += `Timed-out Mutations: ${timedOutMutations}\n`;
     output += `Erroneous Mutations: ${erroneousMutations}\n`;
+
     if (!isNaN(mutationScore)) {
-      output += `Mutation Score: ${mutationScore.toFixed(2)}%\n\n`;
+      output += `Mutation Score: ${
+        mutationScore.toFixed(2)
+      }% (Killed + Type Errors)\n\n`;
     }
 
     if (errors.length > 0) {

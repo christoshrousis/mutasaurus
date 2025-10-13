@@ -37,7 +37,12 @@ export type TestFileToSourceFileMapError = {
 export interface TestResult {
   mutation: MutationRun;
   /** Outcome of the worker process */
-  outcome: "tests-passed" | "tests-failed" | "timed-out" | "error";
+  outcome:
+    | "tests-passed"
+    | "tests-failed"
+    | "timed-out"
+    | "error"
+    | "type-error";
   /**
    * The error that occurred during the test run, if any.
    */

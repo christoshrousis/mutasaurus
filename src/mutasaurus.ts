@@ -16,13 +16,15 @@ import {
  * - `survived`: The mutation survived the tests.
  * - `timed-out`: The test suite run for the mutation timed out.
  * - `error`: The worker process running the tests for the mutation caused an error to be thrown.
+ * - `type-error`: The mutation resulted in a TypeScript type error, preventing the tests from running.
  */
 export type MutationStatus =
   | "waiting"
   | "killed"
   | "survived"
   | "timed-out"
-  | "error";
+  | "error"
+  | "type-error";
 
 /**
  * A single mutation run, as part of the mutation testing process.
@@ -115,6 +117,7 @@ export type MutasaurusResults = {
   survivedMutations: number;
   erroneousMutations: number;
   timedOutMutations: number;
+  typeErrorMutations: number;
   mutations: MutationRun[];
   errors: TestFileToSourceFileMapError[];
 };
@@ -230,12 +233,16 @@ export class Mutasaurus {
     const timedOutMutations =
       result.filter((result) => result.mutation.status === "timed-out")
         .length;
+    const typeErrorMutations =
+      result.filter((result) => result.mutation.status === "type-error")
+        .length;
     const outcome: Omit<MutasaurusResults, "totalTime"> = {
       totalMutations: mutations.length,
       killedMutations,
       survivedMutations,
       erroneousMutations,
       timedOutMutations,
+      typeErrorMutations,
       mutations: result.map((result) => result.mutation),
       errors,
     };

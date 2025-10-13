@@ -69,6 +69,40 @@ self.onmessage = async (
   });
 
   try {
+    // First, run type checking if type checking is enabled (noCheck is false)
+    if (!noCheck) {
+      const typeCheckProcess = new Deno.Command("deno", {
+        args: [
+          "check",
+          ...testFilesToRun,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+        cwd: workingDirectory,
+      });
+
+      const { code: typeCheckCode, stderr: typeCheckStderr } =
+        await typeCheckProcess.output();
+
+      // If type checking fails, this mutation caused a type error
+      if (typeCheckCode !== 0) {
+        const decodedError = new TextDecoder().decode(typeCheckStderr);
+        const duration = performance.now() - startTime;
+        mutation.status = "type-error";
+        mutation.duration = duration;
+
+        const testResult: TestResult = {
+          mutation,
+          outcome: "type-error",
+          error: decodedError,
+          duration,
+        };
+        self.postMessage(testResult);
+        return;
+      }
+    }
+
+    // If type checking passes (or is disabled), run the tests
     const process = new Deno.Command("deno", {
       args: [
         "test",
