@@ -1,4 +1,4 @@
-import { Node, parseAndWalk } from "oxc-walker";
+import { parseAndWalk } from "oxc-walker";
 import {
   AssignmentExpression,
   AssignmentOperator,
@@ -207,7 +207,7 @@ export class Mutator {
     const exhaustiveMode = this.exhaustiveMode;
 
     parseAndWalk(content, fileName, {
-      enter(node: Node) {
+      enter(node) {
         switch (node.type) {
           case "BinaryExpression":
             {
