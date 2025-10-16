@@ -162,14 +162,14 @@ export class Mutasaurus {
     sourceFiles: [],
     testFiles: [],
     operators: ["arithmetic", "logical", "control"],
-    workers: 8,
+    workers: 4,
     timeout: 10000,
     timeoutMultiplier: 3,
     exhaustiveMode: false,
     workingDirectory: Deno.cwd(),
     debug: false,
     noCheck: false,
-    usePersistentWorkers: false,
+    usePersistentWorkers: true,
     useInMemoryMutations: false,
   };
   private mutator: Mutator;

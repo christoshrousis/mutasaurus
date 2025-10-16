@@ -223,7 +223,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     default: {
       const errorResponse: WorkerResponse = {
         type: "error",
-        error: `Unknown message type: ${(message as unknown as { type?: string | null })?.type}`,
+        error: `Unknown message type: ${
+          (message as unknown as { type?: string | null })?.type
+        }`,
       };
       self.postMessage(errorResponse);
     }

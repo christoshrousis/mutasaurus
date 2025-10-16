@@ -96,6 +96,18 @@ Mutasaurus uses workers, to take advantage of parallel execution.
 This will default to 4, but depending on your machine's cores and logical cores,
 you may or may not see improvements if you alter this number.
 
+#### Persistent Workers
+The original implementation of Mutasaurus would actually spawn a worker per 
+mutation, but only run one at a time. This was inefficient as it used a lot
+of I/O. Instead of completely removing the legacy implementation, I decided
+to trial it with a config flag. After I was satisfied that it was stable, 
+I then decided to flip it to default to true.
+
+#### In Memory Mutations - Incomplete, in development.
+Ideally, mutations should occur in memory, without writing mutated files to 
+disk at all. This should improve performance by skipping I/O. This is 
+currently in development and doesn't work yet.
+
 #### Timeout
 The amount of time you should allow a runner to go, before considering it
 "timed-out". Note, that some mutations can cause infinite evaluations,
@@ -131,11 +143,9 @@ Note: Currently there is only a single E2E test
 
 ## Road to V1
 
-- [ ] Add CLI support.
 - [ ] Close to parity¹ mutation support with StrykerJS.²
 - [ ] Use coverage reporting to run test suite subset to increase performance.
 - [ ] Implement StykerJS style cache system to avoid re-running whats not required.
-- [ ] Add web based accounts & reporting.
   
 
 ## Contributing
