@@ -96,6 +96,12 @@ export interface MutasaurusConfig {
    * IMPORTANT: Requires careful synchronization - only one mutation per source file at a time.
    */
   useInMemoryMutations: boolean;
+  /** The format of the report to generate. Defaults to "standard".
+   *
+   * - "standard": Generates a text-based report of survived mutations (backward compatible)
+   * - "extended-file-centric": Generates a comprehensive JSON report grouped by source file with coverage information
+   */
+  reportFormat: "standard" | "extended-file-centric";
 }
 
 /**
@@ -120,6 +126,7 @@ export interface MutasaurusConfigInput {
   noCheck?: boolean;
   usePersistentWorkers?: boolean;
   useInMemoryMutations?: boolean;
+  reportFormat?: "standard" | "extended-file-centric";
 }
 
 /**
@@ -171,6 +178,7 @@ export class Mutasaurus {
     noCheck: false,
     usePersistentWorkers: true,
     useInMemoryMutations: false,
+    reportFormat: "standard",
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -267,7 +275,16 @@ export class Mutasaurus {
       errors,
     };
     if (generateReport) {
-      await this.reporter.generateReport(outcome, reportOutputPath);
+      if (this.config.reportFormat === "extended-file-centric") {
+        await this.reporter.generateExtendedFileCentricReport(
+          outcome,
+          this.sourceFiles,
+          this.enhancedCoverageData,
+          reportOutputPath,
+        );
+      } else {
+        await this.reporter.generateReport(outcome, reportOutputPath);
+      }
     }
 
     try {
@@ -292,16 +309,28 @@ export class Mutasaurus {
     };
   }
 
+  private enhancedCoverageData = new Map<
+    string,
+    Array<import("./testRunner.ts").EnhancedCoverageData>
+  >();
+
   private async generateMutations(): Promise<{
     mutations: MutationRun[];
     errors: TestFileToSourceFileMapError[];
   }> {
-    const { sourceFileToTestFileCoverage, errors } = await this.testRunner
+    const {
+      sourceFileToTestFileCoverage,
+      enhancedCoverageData,
+      errors,
+    } = await this.testRunner
       .initialTestRunsWithCoverage({
         sourceFiles: this.sourceFiles,
         testFiles: this.testFiles,
         workingDirectoryIn: this.config.workingDirectory,
       });
+
+    // Store enhanced coverage data for extended reports
+    this.enhancedCoverageData = enhancedCoverageData;
 
     // Build a list of all possible mutations based off all the supplied files.
     const mutations: MutationRun[] = [];

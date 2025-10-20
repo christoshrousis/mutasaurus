@@ -30,6 +30,17 @@ export type TestFileToSourceFileMapError = {
 };
 
 /**
+ * Enhanced coverage data that includes the raw V8 coverage JSON.
+ * This preserves coverage information for future line-level analysis.
+ */
+export type EnhancedCoverageData = {
+  /** The test file that provided this coverage */
+  testFile: TestFile;
+  /** The raw V8 coverage JSON data (for future line-level parsing) */
+  coverageJson?: unknown;
+};
+
+/**
  * The result of a test run.
  *
  * Contains the original mutation run object,
@@ -348,12 +359,22 @@ export class TestRunner {
         SourceFile["relativePath"],
         Array<TestFile["relativePath"]>
       >;
+      // Enhanced coverage data for extended reports
+      enhancedCoverageData: Map<
+        SourceFile["relativePath"],
+        Array<EnhancedCoverageData>
+      >;
       errors: TestFileToSourceFileMapError[];
     }
   > {
     const sourceFileToTestFileCoverage = new Map<
       SourceFile["relativePath"],
       Array<TestFile["relativePath"]>
+    >();
+    // Store enhanced coverage data for extended reports
+    const enhancedCoverageData = new Map<
+      SourceFile["relativePath"],
+      Array<EnhancedCoverageData>
     >();
     const errors: TestFileToSourceFileMapError[] = [];
     const currentWorkingDirectory = workingDirectoryIn;
@@ -412,12 +433,25 @@ export class TestRunner {
           sourceFile.path === coverageFilePath
         );
         if (isASourceFile) {
+          // Store file-level coverage (original behavior)
           const currentCoverage =
             sourceFileToTestFileCoverage.get(coverageFilePath) ?? [];
           currentCoverage.push(testFile.path);
           sourceFileToTestFileCoverage.set(
             coverageFilePath,
             currentCoverage,
+          );
+
+          // Store enhanced coverage data for extended reports
+          const currentEnhancedCoverage =
+            enhancedCoverageData.get(coverageFilePath) ?? [];
+          currentEnhancedCoverage.push({
+            testFile,
+            coverageJson: coverage,
+          });
+          enhancedCoverageData.set(
+            coverageFilePath,
+            currentEnhancedCoverage,
           );
         }
       }
@@ -449,7 +483,7 @@ export class TestRunner {
       }
     }
 
-    return { sourceFileToTestFileCoverage, errors };
+    return { sourceFileToTestFileCoverage, enhancedCoverageData, errors };
   }
 
   /**
