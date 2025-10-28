@@ -13,6 +13,7 @@ import { expandGlob } from "@std/fs";
 import { MutationRun } from "../mod.ts";
 import { MemoryAwareWorkerPool, MemoryMonitor } from "./memoryMonitor.ts";
 import { PersistentWorkerPool, WorkerTask } from "./persistentWorkerPool.ts";
+import { Logger } from "./logger.ts";
 
 type File = {
   path: string;
@@ -144,7 +145,7 @@ export class TestRunner {
       await pool.initialize();
 
       if (this.debug) {
-        console.log(
+        Logger.log(
           `Running ${mutations.length} mutations with persistent worker pool...`,
         );
       }
@@ -171,7 +172,7 @@ export class TestRunner {
         const percentageComplete = (status.tasksCompleted / mutations.length) *
           100;
         const encoder = new TextEncoder();
-        Deno.stdout.write(
+        Logger.stdoutWrite(
           encoder.encode(
             `${replaceLine}Status: Active=${status.activeWorkers}/${status.totalWorkers}, Queued=${status.queuedTasks}, Completed=${status.tasksCompleted}/${mutations.length}, ${
               percentageComplete.toFixed(2)
@@ -187,7 +188,7 @@ export class TestRunner {
       } finally {
         // Clean up
         clearInterval(statusInterval);
-        console.log("\nAll tasks completed");
+        Logger.log("\nAll tasks completed");
       }
     } finally {
       // Shutdown pool
@@ -324,13 +325,12 @@ export class TestRunner {
         ((status.queuedTasks / taskPromises.length) *
           100);
       const encoder = new TextEncoder();
-      await Deno.stdout.write(
-        encoder.encode(
-          `${replaceLine}Status: Active=${status.activeWorkers}, Queued=${status.queuedTasks}, Total=${taskPromises.length} Memory=${
-            status.memoryUsage?.rssMB || 0
-          }MB, ${percentageComplete.toFixed(2)}% complete`,
-        ),
+      const data = encoder.encode(
+        `${replaceLine}Status: Active=${status.activeWorkers}, Queued=${status.queuedTasks}, Total=${taskPromises.length} Memory=${
+          status.memoryUsage?.rssMB || 0
+        }MB, ${percentageComplete.toFixed(2)}% complete`,
       );
+      Logger.stdoutWrite(data);
     }, 1000);
 
     try {
@@ -341,7 +341,7 @@ export class TestRunner {
       // Clean up
       clearInterval(statusInterval);
       monitor.stop();
-      console.log("\nAll tasks completed");
+      Logger.log("\nAll tasks completed");
     }
   }
 
@@ -470,16 +470,16 @@ export class TestRunner {
       );
 
       if (this.debug) {
-        console.log(`\nDynamic timeout calculation:`);
-        console.log(
+        Logger.log(`\nDynamic timeout calculation:`);
+        Logger.log(
           `  - Test run times: ${
             testRunTimes.map((t) => Math.round(t)).join(", ")
           }ms`,
         );
-        console.log(`  - Slowest test: ${Math.round(maxTestTime)}ms`);
-        console.log(`  - Timeout multiplier: ${this.timeoutMultiplier}x`);
-        console.log(`  - Calculated timeout: ${this.dynamicTimeout}ms`);
-        console.log(`  - Static timeout: ${this.timeout}ms`);
+        Logger.log(`  - Slowest test: ${Math.round(maxTestTime)}ms`);
+        Logger.log(`  - Timeout multiplier: ${this.timeoutMultiplier}x`);
+        Logger.log(`  - Calculated timeout: ${this.dynamicTimeout}ms`);
+        Logger.log(`  - Static timeout: ${this.timeout}ms`);
       }
     }
 
@@ -511,10 +511,10 @@ export class TestRunner {
     }
 
     if (this.debug) {
-      console.log(
+      Logger.log(
         `Running ${mutations.length} mutations with in-memory mode...`,
       );
-      console.log(`Grouped into ${mutationsBySourceFile.size} source files`);
+      Logger.log(`Grouped into ${mutationsBySourceFile.size} source files`);
     }
 
     // Create a semaphore to limit concurrent source file mutations
@@ -630,13 +630,12 @@ export class TestRunner {
       const replaceLine = this.debug ? "" : "\r";
       const percentageComplete = (results.length / mutations.length) * 100;
       const encoder = new TextEncoder();
-      await Deno.stdout.write(
-        encoder.encode(
-          `${replaceLine}Status: Active=${status.activeWorkers}, Queued=${status.queuedTasks}, Completed=${results.length}/${mutations.length}, Memory=${
-            status.memoryUsage?.rssMB || 0
-          }MB, ${percentageComplete.toFixed(2)}% complete`,
-        ),
+      const data = encoder.encode(
+        `${replaceLine}Status: Active=${status.activeWorkers}, Queued=${status.queuedTasks}, Completed=${results.length}/${mutations.length}, Memory=${
+          status.memoryUsage?.rssMB || 0
+        }MB, ${percentageComplete.toFixed(2)}% complete`,
       );
+      Logger.stdoutWrite(data);
     }, 1000);
 
     try {
@@ -647,7 +646,7 @@ export class TestRunner {
       // Clean up
       clearInterval(statusInterval);
       monitor.stop();
-      console.log("\nAll tasks completed");
+      Logger.log("\nAll tasks completed");
     }
   }
 }

@@ -7,6 +7,7 @@ import {
   SourceFile,
   TestFile,
 } from "./findSourceAndTestFiles.ts";
+import { Logger } from "./logger.ts";
 
 /**
  * The different states that a MutationRun can be in, as part of the mutation testing process.
@@ -102,6 +103,12 @@ export interface MutasaurusConfig {
    * - "extended-file-centric": Generates a comprehensive JSON report grouped by source file with coverage information
    */
   reportFormat: "standard" | "extended-file-centric";
+  /** Whether to run in silent mode (suppress all console.log output). Defaults to false.
+   *
+   * When enabled, only console.error and console.warn will be output.
+   * This is useful when running mutasaurus as part of a CI/CD pipeline where you only want to see errors.
+   */
+  silent: boolean;
 }
 
 /**
@@ -127,6 +134,7 @@ export interface MutasaurusConfigInput {
   usePersistentWorkers?: boolean;
   useInMemoryMutations?: boolean;
   reportFormat?: "standard" | "extended-file-centric";
+  silent?: boolean;
 }
 
 /**
@@ -179,6 +187,7 @@ export class Mutasaurus {
     usePersistentWorkers: true,
     useInMemoryMutations: false,
     reportFormat: "standard",
+    silent: false,
   };
   private mutator: Mutator;
   private reporter: Reporter;
@@ -208,6 +217,9 @@ export class Mutasaurus {
       this.config.usePersistentWorkers,
       this.config.useInMemoryMutations,
     );
+
+    // Set silent mode for the logger
+    Logger.setSilentMode(this.config.silent);
   }
 
   async run(
@@ -220,17 +232,17 @@ export class Mutasaurus {
 
     if (generateReport) {
       // Print opening statement.
-      console.log("\n---------------------------------\n");
-      console.log("Running Mutasaurus, with the following config...");
-      console.log(this.config);
+      Logger.log("\n---------------------------------\n");
+      Logger.log("Running Mutasaurus, with the following config...");
+      Logger.log(this.config);
 
       if (!sourceFilesProvided) {
-        console.log("\n---------------------------------\n");
-        console.log(
+        Logger.log("\n---------------------------------\n");
+        Logger.log(
           "Source files not provided, will search for source and test files in the current working directory",
         );
       }
-      console.log("\n---------------------------------\n\n");
+      Logger.log("\n---------------------------------\n\n");
     }
 
     // Set source and test files.
@@ -300,7 +312,7 @@ export class Mutasaurus {
 
     const programEndTime = performance.now();
     if (generateReport) {
-      console.log(`Program took ${programEndTime - startTime}ms to run`);
+      Logger.log(`Program took ${programEndTime - startTime}ms to run`);
     }
 
     return {

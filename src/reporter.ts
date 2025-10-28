@@ -6,7 +6,8 @@ import {
   type MutationsAgainstSourceFile,
 } from "./extendedReportTypes.ts";
 import { type EnhancedCoverageData } from "./testRunner.ts";
-import type { SourceFile, TestFile } from "./findSourceAndTestFiles.ts";
+import type { SourceFile } from "./findSourceAndTestFiles.ts";
+import { Logger } from "./logger.ts";
 
 /**
  * Formats the results of the mutation testing process into a human readable report.
@@ -112,7 +113,7 @@ export class Reporter {
     if (outputPath) {
       await Deno.writeTextFile(outputPath, report);
     } else {
-      console.log(report);
+      Logger.log(report);
     }
   }
 
@@ -145,7 +146,7 @@ export class Reporter {
     // Write JSON report
     await Deno.writeTextFile(finalOutputPath, JSON.stringify(report, null, 2));
 
-    console.log(
+    Logger.log(
       `\nExtended file-centric report saved to: ${finalOutputPath}\n`,
     );
   }
@@ -232,18 +233,16 @@ export class Reporter {
 
     // Calculate mutation scores for each file
     for (const [_, fileData] of mutationsBySourceFile) {
-      const totalForFile =
-        fileData.killedMutations.length +
+      const totalForFile = fileData.killedMutations.length +
         fileData.survivedMutations.length +
         fileData.timedOutMutations.length +
         fileData.erroneousMutations.length +
         fileData.typeErrorMutations.length;
 
       if (totalForFile > 0) {
-        fileData.mutationScore =
-          ((fileData.killedMutations.length +
-            fileData.typeErrorMutations.length) /
-            totalForFile) * 100;
+        fileData.mutationScore = ((fileData.killedMutations.length +
+          fileData.typeErrorMutations.length) /
+          totalForFile) * 100;
       } else {
         fileData.mutationScore = 0;
       }

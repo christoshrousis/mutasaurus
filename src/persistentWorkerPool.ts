@@ -13,6 +13,7 @@
 
 import { MutationRun } from "./mutasaurus.ts";
 import { TestResult } from "./testRunner.ts";
+import { Logger } from "./logger.ts";
 
 export interface WorkerTask {
   mutation: MutationRun;
@@ -91,7 +92,7 @@ export class PersistentWorkerPool {
    */
   async initialize(): Promise<void> {
     if (this.debug) {
-      console.log(
+      Logger.log(
         `Initializing persistent worker pool with ${this.maxWorkers} workers...`,
       );
     }
@@ -106,7 +107,7 @@ export class PersistentWorkerPool {
     }, this.workerHealthCheckInterval);
 
     if (this.debug) {
-      console.log(
+      Logger.log(
         `Worker pool initialized with ${this.workers.length} workers`,
       );
     }
@@ -177,7 +178,7 @@ export class PersistentWorkerPool {
     switch (message.type) {
       case "ready":
         if (this.debug) {
-          console.log(`Worker ${workerInfo.workerId} is ready`);
+          Logger.log(`Worker ${workerInfo.workerId} is ready`);
         }
         workerInfo.isIdle = true;
         this.processQueue();
@@ -203,7 +204,7 @@ export class PersistentWorkerPool {
             // Check if worker needs restart due to task limit
             if (workerInfo.tasksCompleted >= this.maxTasksPerWorker) {
               if (this.debug) {
-                console.log(
+                Logger.log(
                   `Worker ${workerInfo.workerId} reached task limit, restarting...`,
                 );
               }
@@ -265,7 +266,7 @@ export class PersistentWorkerPool {
    */
   private async restartWorker(workerInfo: WorkerInfo): Promise<void> {
     if (this.debug) {
-      console.log(`Restarting worker ${workerInfo.workerId}...`);
+      Logger.log(`Restarting worker ${workerInfo.workerId}...`);
     }
 
     // Terminate old worker
@@ -286,7 +287,7 @@ export class PersistentWorkerPool {
     newWorker.restartCount = workerInfo.restartCount + 1;
 
     if (this.debug) {
-      console.log(
+      Logger.log(
         `Worker restarted (restart count: ${newWorker.restartCount})`,
       );
     }
@@ -327,7 +328,7 @@ export class PersistentWorkerPool {
         const idleTime = now - workerInfo.lastActivity;
         if (idleTime > maxIdleTime) {
           if (this.debug) {
-            console.log(
+            Logger.log(
               `Worker ${workerInfo.workerId} idle for ${idleTime}ms, restarting...`,
             );
           }
@@ -414,7 +415,7 @@ export class PersistentWorkerPool {
 
         // Restart the worker as it may be stuck
         if (this.debug) {
-          console.log(
+          Logger.log(
             `Task ${pendingTask.taskId} timed out, restarting worker...`,
           );
         }
@@ -478,7 +479,7 @@ export class PersistentWorkerPool {
     this.isShuttingDown = true;
 
     if (this.debug) {
-      console.log("Shutting down worker pool...");
+      Logger.log("Shutting down worker pool...");
     }
 
     // Stop health check
@@ -515,7 +516,7 @@ export class PersistentWorkerPool {
     this.workers = [];
 
     if (this.debug) {
-      console.log("Worker pool shut down");
+      Logger.log("Worker pool shut down");
     }
   }
 }

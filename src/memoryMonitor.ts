@@ -1,5 +1,7 @@
 // memoryMonitor.ts - Advanced Memory Monitoring System for Deno Workers
 
+import { Logger } from "./logger.ts";
+
 /**
  * Configuration options for the MemoryMonitor
  */
@@ -313,7 +315,7 @@ class MemoryMonitor {
     if (this.options.logToConsole) {
       switch (level) {
         case "INFO":
-          console.log(logMessage);
+          Logger.log(logMessage);
           break;
         case "WARNING":
           console.warn(logMessage);
