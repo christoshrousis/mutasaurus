@@ -18,6 +18,7 @@ import { Logger } from "./logger.ts";
  * - `timed-out`: The test suite run for the mutation timed out.
  * - `error`: The worker process running the tests for the mutation caused an error to be thrown.
  * - `type-error`: The mutation resulted in a TypeScript type error, preventing the tests from running.
+ * - `incomplete`: The mutation was not tested due to global timeout being reached.
  */
 export type MutationStatus =
   | "waiting"
@@ -25,7 +26,8 @@ export type MutationStatus =
   | "survived"
   | "timed-out"
   | "error"
-  | "type-error";
+  | "type-error"
+  | "incomplete";
 
 /**
  * A single mutation run, as part of the mutation testing process.
@@ -62,6 +64,11 @@ export interface MutasaurusConfig {
   workers: number;
   /** The timeout for the individual workers in the worker pools. */
   timeout: number;
+  /** Global timeout for the entire mutation testing run in milliseconds. When this timeout is reached,
+   * the run will gracefully shut down and generate a report with incomplete mutations marked.
+   * Set to 0 to disable. Defaults to 1800000 (30 minutes).
+   */
+  globalTimeout: number;
   /** Multiplier applied to baseline test execution time to calculate dynamic timeout. Defaults to 3.
    *
    * When enabled, the actual timeout used will be: baseline_test_time * timeoutMultiplier
@@ -83,20 +90,6 @@ export interface MutasaurusConfig {
   debug: boolean;
   /** Whether to skip type checking when running tests. Defaults to false. */
   noCheck: boolean;
-  /** Whether to use persistent worker pool (reuse workers across mutations). Defaults to false.
-   *
-   * When enabled, workers stay alive for the entire mutation testing session and are reused.
-   * This improves performance by eliminating worker spawn overhead.
-   * Recommended for large mutation test suites (100+ mutations).
-   */
-  usePersistentWorkers: boolean;
-  /** Whether to use in-memory mutations (apply mutations directly to source files). Defaults to false.
-   *
-   * When enabled, mutations are applied directly to source files without copying to temporary directories.
-   * This changes the architecture of the mutation testing process and may improve performance by eliminating file I/O overhead.
-   * IMPORTANT: Requires careful synchronization - only one mutation per source file at a time.
-   */
-  useInMemoryMutations: boolean;
   /** The format of the report to generate. Defaults to "standard".
    *
    * - "standard": Generates a text-based report of survived mutations (backward compatible)
@@ -126,13 +119,12 @@ export interface MutasaurusConfigInput {
   operators?: string[];
   workers?: number;
   timeout?: number;
+  globalTimeout?: number;
   timeoutMultiplier?: number;
   exhaustiveMode?: boolean;
   workingDirectory?: string;
   debug?: boolean;
   noCheck?: boolean;
-  usePersistentWorkers?: boolean;
-  useInMemoryMutations?: boolean;
   reportFormat?: "standard" | "extended-file-centric";
   silent?: boolean;
 }
@@ -149,6 +141,8 @@ export type MutasaurusResults = {
   erroneousMutations: number;
   timedOutMutations: number;
   typeErrorMutations: number;
+  incompleteMutations: number;
+  globalTimeoutHit: boolean;
   mutations: MutationRun[];
   errors: TestFileToSourceFileMapError[];
 };
@@ -179,13 +173,12 @@ export class Mutasaurus {
     operators: ["arithmetic", "logical", "control"],
     workers: 4,
     timeout: 10000,
+    globalTimeout: 1800000, // 30 minutes
     timeoutMultiplier: 3,
     exhaustiveMode: false,
     workingDirectory: Deno.cwd(),
     debug: false,
     noCheck: false,
-    usePersistentWorkers: true,
-    useInMemoryMutations: false,
     reportFormat: "standard",
     silent: false,
   };
@@ -214,8 +207,6 @@ export class Mutasaurus {
       this.config.debug,
       this.config.noCheck,
       this.config.timeoutMultiplier,
-      this.config.usePersistentWorkers,
-      this.config.useInMemoryMutations,
     );
 
     // Set silent mode for the logger
@@ -257,12 +248,60 @@ export class Mutasaurus {
     this.testFiles = testFiles;
 
     const { mutations, errors } = await this.generateMutations();
-    const result = await this.testRunner.runTests(
-      mutations,
-      this.sourceFiles,
-      this.testFiles,
-      this.config.workingDirectory,
-    );
+
+    // Set up global timeout if configured
+    let globalTimeoutHit = false;
+    let result: Awaited<ReturnType<typeof this.testRunner.runTests>>;
+
+    if (this.config.globalTimeout > 0) {
+      const testPromise = this.testRunner.runTests(
+        mutations,
+        this.sourceFiles,
+        this.testFiles,
+        this.config.workingDirectory,
+      );
+
+      let globalTimeoutId: number | undefined;
+      const timeoutPromise = new Promise<null>((resolve) => {
+        globalTimeoutId = setTimeout(() => {
+          globalTimeoutHit = true;
+          resolve(null);
+        }, this.config.globalTimeout);
+      });
+
+      const raceResult = await Promise.race([testPromise, timeoutPromise]);
+
+      if (raceResult === null) {
+        // Global timeout was hit
+        Logger.log("\n\nGlobal timeout reached. Shutting down gracefully...\n");
+        await this.testRunner.immediateShutdown();
+
+        // Get partial results from test runner
+        result = await testPromise;
+
+        // Mark all waiting mutations as incomplete
+        for (const testResult of result) {
+          if (testResult.mutation.status === "waiting") {
+            testResult.mutation.status = "incomplete";
+            testResult.mutation.duration = 0;
+          }
+        }
+      } else {
+        // Tests completed before global timeout; clear the timer
+        if (globalTimeoutId !== undefined) {
+          clearTimeout(globalTimeoutId);
+        }
+        result = raceResult;
+      }
+    } else {
+      // No global timeout configured
+      result = await this.testRunner.runTests(
+        mutations,
+        this.sourceFiles,
+        this.testFiles,
+        this.config.workingDirectory,
+      );
+    }
 
     const killedMutations =
       result.filter((result) => result.mutation.status === "killed").length;
@@ -276,6 +315,9 @@ export class Mutasaurus {
     const typeErrorMutations =
       result.filter((result) => result.mutation.status === "type-error")
         .length;
+    const incompleteMutations =
+      result.filter((result) => result.mutation.status === "incomplete")
+        .length;
     const outcome: Omit<MutasaurusResults, "totalTime"> = {
       totalMutations: mutations.length,
       killedMutations,
@@ -283,6 +325,8 @@ export class Mutasaurus {
       erroneousMutations,
       timedOutMutations,
       typeErrorMutations,
+      incompleteMutations,
+      globalTimeoutHit,
       mutations: result.map((result) => result.mutation),
       errors,
     };

@@ -24,6 +24,8 @@ export class Reporter {
       timedOutMutations,
       erroneousMutations,
       typeErrorMutations,
+      incompleteMutations,
+      globalTimeoutHit,
       mutations,
       errors,
     } = results;
@@ -32,6 +34,14 @@ export class Reporter {
 
     let output = "\nMutation Testing Report\n";
     output += "=====================\n";
+
+    if (globalTimeoutHit) {
+      output += "\n⚠️  GLOBAL TIMEOUT REACHED\n";
+      output += "The mutation testing run hit the global timeout limit.\n";
+      output +=
+        `${incompleteMutations} mutation(s) were not tested and are marked as incomplete.\n`;
+      output += "=====================\n";
+    }
 
     if (survivedMutations > 0) {
       const timestamp = new Date().toISOString();
@@ -76,6 +86,7 @@ export class Reporter {
     output += `Survived Mutations: ${survivedMutations}\n`;
     output += `Timed-out Mutations: ${timedOutMutations}\n`;
     output += `Erroneous Mutations: ${erroneousMutations}\n`;
+    output += `Incomplete Mutations: ${incompleteMutations}\n`;
 
     if (!isNaN(mutationScore)) {
       output += `Mutation Score: ${
@@ -197,6 +208,7 @@ export class Reporter {
         timedOutMutations: [],
         erroneousMutations: [],
         typeErrorMutations: [],
+        incompleteMutations: [],
         coverage: coverageTestFiles,
         mutationScore: 0,
       });
@@ -228,6 +240,9 @@ export class Reporter {
         case "type-error":
           fileData.typeErrorMutations.push(mutation);
           break;
+        case "incomplete":
+          fileData.incompleteMutations.push(mutation);
+          break;
       }
     }
 
@@ -237,7 +252,8 @@ export class Reporter {
         fileData.survivedMutations.length +
         fileData.timedOutMutations.length +
         fileData.erroneousMutations.length +
-        fileData.typeErrorMutations.length;
+        fileData.typeErrorMutations.length +
+        fileData.incompleteMutations.length;
 
       if (totalForFile > 0) {
         fileData.mutationScore = ((fileData.killedMutations.length +

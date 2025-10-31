@@ -62,6 +62,8 @@ export type MutationsAgainstSourceFile = {
   erroneousMutations: Array<MutationRun>;
   /** Mutations that caused TypeScript type errors */
   typeErrorMutations: Array<MutationRun>;
+  /** Mutations that were not tested due to global timeout */
+  incompleteMutations: Array<MutationRun>;
   /** Test files that provide coverage for this source file */
   coverage: Array<ExtendedReportTestFile>;
   /** The mutation score for this specific file (0-100) */

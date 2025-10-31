@@ -151,16 +151,22 @@ export class PersistentWorkerPool {
 
     this.workers.push(workerInfo);
 
-    // Wait for worker to become ready
+    // Wait for worker to become ready without polling timers
     await new Promise<void>((resolve) => {
-      const checkReady = () => {
-        if (workerInfo.isIdle) {
+      if (workerInfo.isIdle) {
+        resolve();
+        return;
+      }
+
+      const onReady = (e: MessageEvent<WorkerResponse>) => {
+        if (e.data && e.data.type === "ready") {
+          worker.removeEventListener("message", onReady as EventListener);
           resolve();
-        } else {
-          setTimeout(checkReady, 10);
         }
       };
-      checkReady();
+
+      // Use addEventListener so we don't interfere with the primary onmessage handler
+      worker.addEventListener("message", onReady as EventListener);
     });
 
     return workerInfo;
@@ -480,6 +486,47 @@ export class PersistentWorkerPool {
 
     if (this.debug) {
       Logger.log("Shutting down worker pool...");
+    }
+
+    // Resolve any queued tasks immediately so upstream awaiters can finish
+    // These will have mutation.status remaining as "waiting" and will be
+    // converted to "incomplete" by the caller when handling global timeout.
+    for (const pendingTask of this.taskQueue.splice(0)) {
+      if (pendingTask.timeoutId) {
+        clearTimeout(pendingTask.timeoutId);
+      }
+      pendingTask.resolve({
+        mutation: {
+          ...pendingTask.task.mutation,
+          // leave status as-is (likely "waiting"); caller will mark as incomplete
+        },
+        outcome: "error",
+        duration: 0,
+      } as unknown as TestResult);
+    }
+
+    // Resolve any in-flight tasks as well to prevent hanging awaits
+    for (const workerInfo of this.workers) {
+      const current = workerInfo.currentTask;
+      if (current) {
+        if (current.timeoutId) {
+          clearTimeout(current.timeoutId);
+        }
+        try {
+          current.resolve({
+            mutation: {
+              ...current.task.mutation,
+              // leave status for caller to mark as incomplete
+            },
+            outcome: "error",
+            duration: 0,
+          } as unknown as TestResult);
+        } catch (_e) {
+          // ignore resolve errors
+        }
+        workerInfo.currentTask = null;
+        workerInfo.isIdle = true;
+      }
     }
 
     // Stop health check

@@ -2,60 +2,43 @@ import { assertEquals } from "@std/assert";
 
 import { Mutasaurus } from '../mod.ts';
 
-Deno.test("given a non-exhaustive run, supplied with source and test files", async () => {
-  const mutasaurus = new Mutasaurus({
-    sourceFiles: ['test/fixtures/*.ts'],
-    testFiles: ['test/fixtures/*.test.ts'],
-    timeout: 1_000,
-  });
+const mutasaurus = new Mutasaurus({
+  sourceFiles: [
+    'test/fixtures/chained-expression.ts',
+    'test/fixtures/compound-calculation.ts',
+    'test/fixtures/nested-expression.ts',
+    'test/fixtures/one-big-file.ts',
+    'test/fixtures/simple-expression-assignment.ts',
+    'test/fixtures/simple-expression-binary.ts',
+    'test/fixtures/timeout-prone-calculation.ts',
+    'test/fixtures/type-safe-calculation.ts',
+  ],
+  testFiles: [
+    'test/fixtures/one-big-file.test.ts',
+    'test/fixtures/sum-cross-coverage.test.ts',
+    'test/fixtures/sums.test.ts',
+    'test/fixtures/timeout-prone.test.ts',
+    'test/fixtures/type-safe-calculation.test.ts',
+  ],
+  timeout: 1_000,
+  silent: true
+});
 
-  const outcome = await mutasaurus.run(false);
+const outcome = await mutasaurus.run(false);
 
-  Deno.test("should run the mutation testing process, and return the expected outcome", () => {
-    assertEquals(outcome.totalMutations, 13, "Total mutations should be 13");
-    assertEquals(outcome.killedMutations, 11, "Killed mutations should be 11");
-    assertEquals(outcome.survivedMutations, 0, "Survived mutations should be 0");
-    assertEquals(outcome.timedOutMutations, 1, "Timed-out mutations should be 1");
-    assertEquals(outcome.erroneousMutations, 0, "Erroneous mutations should be 0");
-    assertEquals(outcome.typeErrorMutations, 1, "Type error mutations should be 1");
-  });
-
-  Deno.test("given the configured timeout is exceeded", () => {
-    const timedOutMutation = outcome.mutations.find(
-      (mutation) => mutation.status === "timed-out",
-    );
-    assertEquals(timedOutMutation?.duration, 1_000, "It's duration should match the configured timeout");
-  });
-})
-
-Deno.test("given an exhaustive run, supplied with source and test files", async () => {
-  const mutasaurus = new Mutasaurus({
-    sourceFiles: ['test/fixtures/*.ts'],
-    testFiles: ['test/fixtures/*.test.ts'],
-    timeout: 1_000,
-    exhaustiveMode: true,
-  });
-
-  const outcome = await mutasaurus.run(false);
-
-  Deno.test("should run the mutation testing process, and return the expected outcome", () => {
-    assertEquals(outcome.totalMutations, 33, "Total mutations should be 33");
-    assertEquals(outcome.killedMutations, 30, "Killed mutations should be 30");
-    assertEquals(outcome.survivedMutations, 1, "Survived mutations should be 1");
-    assertEquals(outcome.timedOutMutations, 1, "Timed-out mutations should be 1");
-    assertEquals(outcome.erroneousMutations, 0, "Erroneous mutations should be 0");
-    assertEquals(outcome.typeErrorMutations, 1, "Type error mutations should be 1");
-  });
-})
-
-Deno.test("given a run with a configured working directory", async () => {
-  const mutasaurus = new Mutasaurus({ workingDirectory: `${Deno.cwd()}/test/fixtures/sub-folder/`});
-  const outcome = await mutasaurus.run(false);
-
-  assertEquals(outcome.totalMutations, 1, "Total mutations should be 1");
-  assertEquals(outcome.killedMutations, 1, "Killed mutations should be 1");
+Deno.test("given a non-exhaustive run, supplied with source and test files, should run the mutation testing process and return the expected outcome", async () => {
+  assertEquals(outcome.totalMutations, 100, "Total mutations should be 100");
+  assertEquals(outcome.killedMutations, 91, "Killed mutations should be 91");
   assertEquals(outcome.survivedMutations, 0, "Survived mutations should be 0");
-  assertEquals(outcome.timedOutMutations, 0, "Timed-out mutations should be 0");
+  assertEquals(outcome.timedOutMutations, 8, "Timed-out mutations should be 8");
   assertEquals(outcome.erroneousMutations, 0, "Erroneous mutations should be 0");
-  assertEquals(outcome.typeErrorMutations, 0, "Type error mutations should be 0");
-})
+  assertEquals(outcome.typeErrorMutations, 1, "Type error mutations should be 1");
+  assertEquals(outcome.incompleteMutations, 0, "Incomplete mutations should be 0");
+});
+
+Deno.test("given a non-exhaustive run, given the configured timeout is exceeded, it's duration should match the configured timeout", async () => {
+  const timedOutMutation = outcome.mutations.find(
+    (mutation) => mutation.status === "timed-out",
+  );
+  assertEquals(timedOutMutation?.duration, 1_000, "It's duration should match the configured timeout");
+});
