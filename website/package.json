@@ -1,0 +1,17 @@
+{
+  "name": "mutasaurus-website",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^5.7.0",
+    "@astrojs/preact": "^4.0.0",
+    "preact": "^10.27.2",
+    "tailwindcss": "^4.1.10",
+    "@tailwindcss/vite": "^4.1.10",
+    "lucide-preact": "^0.545.0"
+  }
+}

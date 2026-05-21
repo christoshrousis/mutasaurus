@@ -115,7 +115,7 @@ so it is suggested you don't set an arbitrarily large number here.
 
 ## Examples
 
-See: [https://mutasaurus.com/showcase](https://mutasaurus.com/showcase) for a list of mutation runs against open source projects and their results.
+See: [https://christoshrousis.github.io/mutasaurus/](https://christoshrousis.github.io/mutasaurus/) for more information about Mutasaurus.
 
 ## Development
 

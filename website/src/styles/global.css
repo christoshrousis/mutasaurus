@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@utility font-pixel {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.05em;
+}
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: var(--tw-opacity, 0.6); }
+  50% { opacity: 0.1; }
+}
+
+@keyframes meteor-fall {
+  0% {
+    transform: translate(0, 0) rotate(var(--meteor-angle));
+    opacity: var(--meteor-opacity);
+  }
+  100% {
+    transform: translate(var(--end-x), var(--end-y)) rotate(var(--meteor-angle));
+    opacity: 0;
+  }
+}
+
+.star-twinkle {
+  animation: star-twinkle var(--tw-duration, 6s) ease-in-out infinite;
+}
+
+.meteor-particle {
+  animation: meteor-fall var(--fall-duration) var(--fall-delay) linear forwards;
+}

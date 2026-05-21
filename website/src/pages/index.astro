@@ -1,0 +1,61 @@
+---
+import { HeroSection } from '../components/HeroSection.tsx';
+import { FeaturesSection } from '../components/FeaturesSection.tsx';
+import { GetStarted } from '../components/GetStarted.tsx';
+import { Contribute } from '../components/Contribute.tsx';
+import Meteors from '../components/Meteors.tsx';
+import MutationExplainer from '../components/MutationExplainer.tsx';
+import '../styles/global.css';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mutasaurus - Mutation Testing Library</title>
+    <meta
+      name="description"
+      content="Mutasaurus - A powerful mutation testing library for improving your code quality"
+    />
+    <link rel="shortcut icon" href={`${base}favicon.ico`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}logo.svg`} />
+  </head>
+  <body>
+    <div class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white font-mono pb-20">
+
+      <Meteors client:load />
+
+      <HeroSection />
+
+      <div class="mx-auto px-4 sm:px-6 lg:px-8 py-12 max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold text-center mb-4">
+          What is Mutation Testing?
+        </h2>
+        <div class="p-6 bg-gray-800 rounded-lg mb-4">
+          <MutationExplainer client:load />
+        </div>
+        <p class="text-gray-300 max-w-2xl mx-auto">
+          Mutation testing evaluates the quality of your tests by introducing
+          bugs (mutations) into your code and checking if your tests catch them.
+          If your tests fail, the mutant is "killed". If they pass, the mutant
+          "survives". More killed mutants = greater test quality!
+        </p>
+      </div>
+
+      <FeaturesSection />
+
+      <GetStarted />
+
+      <Contribute />
+
+      <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-gray-700 mt-12">
+        <div class="text-center text-gray-400">
+          <p>© {new Date().getFullYear()} Mutasaurus. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
